@@ -1,0 +1,12 @@
+# Railway build configuration (Nixpacks).
+#
+# Works around npm bug #4828: a single fresh `npm install` on Linux can miss a
+# package's optional platform binaries — here @tailwindcss/oxide-linux-x64-gnu,
+# Tailwind v4's Rust engine — causing "Cannot find native binding" during
+# `next build`. We force optional (and dev) deps on and install twice; the
+# second pass reliably resolves the native binding the first pass drops.
+[phases.install]
+cmds = [
+  "npm install --include=optional --include=dev --no-audit --no-fund",
+  "npm install --include=optional --include=dev --no-audit --no-fund",
+]
