@@ -10,3 +10,8 @@ storage/
 npm-debug.log*
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+# Not committed: this lockfile is generated on Windows and omits the Linux
+# native binaries (e.g. @tailwindcss/oxide) that the Railway build needs.
+# Without it, Railway runs `npm install` and resolves the correct binaries.
+/package-lock.json
