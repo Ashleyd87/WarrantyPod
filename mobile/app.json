@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Warranty Vault",
+    "slug": "warranty-vault",
+    "version": "1.0.0",
+    "scheme": "warrantyvault",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#12756b",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ashley.warrantyvault"
+    },
+    "android": {
+      "package": "com.ashley.warrantyvault",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Warranty Vault uses the camera to photograph receipts and serial-number stickers.",
+          "photosPermission": "Warranty Vault needs photo access so you can attach existing receipt photos."
+        }
+      ]
+    ]
+  }
+}

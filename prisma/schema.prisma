@@ -1,0 +1,178 @@
+// Product Warranty & Serial Vault — Prisma schema (PostgreSQL).
+// Enum-like String fields are validated with Zod in lib/validators.ts so the
+// set of allowed values lives in one place shared with the app.
+// DATABASE_URL points at Supabase/Neon Postgres (both cloud and local dev).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Railway/Neon/local Postgres are direct connections, so no separate
+  // directUrl is needed. (If you switch to a POOLED connection such as
+  // Supabase's port 6543, add `directUrl = env("DIRECT_URL")` here.)
+}
+
+// ---------- better-auth core tables ----------
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      Session[]
+  accounts      Account[]
+  settings      UserSettings?
+  productItems  ProductItem[]
+  notifications Notification[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  @@map("verification")
+}
+
+// ---------- App tables ----------
+
+model UserSettings {
+  id               String @id @default(cuid())
+  userId           String @unique
+  user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminderLeadDays Int    @default(30)
+  currency         String @default("USD")
+}
+
+model ProductItem {
+  id                     String    @id @default(cuid())
+  userId                 String
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  brand                  String
+  modelName              String
+  // APPLIANCE | ELECTRONICS | FURNITURE | TOOL | JEWELRY | VEHICLE | SPORTS | OTHER
+  category               String    @default("OTHER")
+  serialNumber           String?
+  purchaseDate           DateTime?
+  purchasePrice          Decimal?
+  currency               String    @default("USD")
+  storeName              String?
+
+  // MANUFACTURER | RETAILER | EXTENDED | CREDIT_CARD | OTHER
+  warrantyType           String    @default("MANUFACTURER")
+  warrantyProvider       String?
+  warrantyDurationMonths Int?
+  warrantyExpirationDate DateTime?
+  // True when the warranty length was assumed (not read from a document).
+  warrantyAssumed        Boolean   @default(false)
+
+  notes                  String?
+  archived               Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  assets                 Asset[]
+  claims                 Claim[]
+  notifications          Notification[]
+
+  @@index([userId])
+  @@index([userId, warrantyExpirationDate])
+}
+
+model Asset {
+  id            String      @id @default(cuid())
+  productItemId String
+  productItem   ProductItem @relation(fields: [productItemId], references: [id], onDelete: Cascade)
+  // RECEIPT | SERIAL_STICKER | WARRANTY_CARD | PRODUCT_PHOTO | MANUAL | OTHER
+  type          String
+  fileKey       String
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  createdAt     DateTime    @default(now())
+
+  @@index([productItemId])
+}
+
+model Claim {
+  id               String      @id @default(cuid())
+  productItemId    String
+  productItem      ProductItem @relation(fields: [productItemId], references: [id], onDelete: Cascade)
+  // DRAFT | SUBMITTED | IN_REVIEW | APPROVED | DENIED | RESOLVED
+  status           String      @default("DRAFT")
+  claimNumber      String?
+  providerContact  String?
+  issueDescription String
+  submittedAt      DateTime?
+  resolvedAt       DateTime?
+  resolutionNotes  String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([productItemId])
+}
+
+model Notification {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productItemId String
+  productItem   ProductItem @relation(fields: [productItemId], references: [id], onDelete: Cascade)
+  // EXPIRING_SOON | EXPIRED | CLAIM_UPDATE
+  type          String
+  title         String
+  body          String
+  readAt        DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@unique([userId, productItemId, type])
+  @@index([userId, readAt])
+}
