@@ -12,13 +12,13 @@
       "distribution": "internal",
       "android": { "buildType": "apk" },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-APP.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://warrantypod-production.up.railway.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-APP.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://warrantypod-production.up.railway.app"
       }
     }
   },
