@@ -54,6 +54,7 @@ export interface ApiItem {
 export interface ApiSettings {
   reminderLeadDays: number;
   currency: string;
+  theme?: string;
 }
 
 export interface ApiNotification {

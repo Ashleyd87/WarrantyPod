@@ -30,6 +30,12 @@
           "cameraPermission": "Warranty Vault uses the camera to photograph receipts and serial-number stickers.",
           "photosPermission": "Warranty Vault needs photo access so you can attach existing receipt photos."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Warranty Vault uses the camera to scan serial stickers, receipts and product photos."
+        }
       ]
     ]
   }

@@ -24,7 +24,7 @@ const MUTED = rgb(0.42, 0.45, 0.5);
 const ACCENT = rgb(0.09, 0.46, 0.42);
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -41,6 +41,14 @@ export async function GET(
     },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Claim-builder UI lets the user choose which proof to include
+  // (?assets=id1,id2). No param = include everything.
+  const assetFilter = request.nextUrl.searchParams.get("assets");
+  if (assetFilter !== null) {
+    const wanted = new Set(assetFilter.split(",").filter(Boolean));
+    item.assets = item.assets.filter((a) => wanted.has(a.id));
+  }
 
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);

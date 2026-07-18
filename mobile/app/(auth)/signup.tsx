@@ -8,12 +8,16 @@ import {
   View,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { authClient } from "@/lib/auth-client";
-import { colors, radius, spacing } from "@/lib/theme";
-import { Button, Card, Field } from "@/components/ui";
+import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
+import { useTheme } from "@/lib/theme-context";
+import { Header } from "@/components/Header";
+import { Field, Headline, Pill } from "@/components/ui";
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { t } = useTheme();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,69 +40,60 @@ export default function SignupScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: "center",
-          padding: spacing(5),
-          gap: spacing(5),
-        }}
+    <SafeAreaView style={{ flex: 1, backgroundColor: ink.paper }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={{ alignItems: "center", gap: 8 }}>
-          <View
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: radius.lg,
-              backgroundColor: colors.primary,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text style={{ fontSize: 30 }}>🛡️</Text>
+        <ScrollView
+          contentContainerStyle={{ padding: SCREEN_PAD, gap: 26, flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Header back right={<View style={{ width: 44 }} />} />
+          <Headline>Proof starts{"\n"}here.</Headline>
+          <View style={{ gap: 16 }}>
+            <Field label="Name" value={name} onChangeText={setName} placeholder="Ashley" />
+            <Field
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            <Field
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="At least 8 characters"
+            />
           </View>
-          <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground }}>
-            Create your vault
-          </Text>
-          <Text style={{ color: colors.muted }}>
-            Stop losing money on expired warranties.
-          </Text>
-        </View>
-
-        <Card style={{ gap: 14 }}>
-          <Field label="Name" value={name} onChangeText={setName} placeholder="Ashley" />
-          <Field
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <Field
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="At least 8 characters"
-          />
-          <Button
-            title={loading ? "Creating…" : "Create account"}
+          <Pill
+            label="Create account"
+            variant="ink"
+            arrow
             loading={loading}
             onPress={submit}
           />
-          <Text style={{ textAlign: "center", color: colors.muted, fontSize: 14 }}>
+          <Text
+            style={{
+              fontFamily: fonts.regular,
+              fontSize: 13.5,
+              color: ink.textSecondary,
+              textAlign: "center",
+            }}
+          >
             Already have an account?{" "}
-            <Link href="/login" style={{ color: colors.primary, fontWeight: "600" }}>
+            <Link
+              href="/login"
+              style={{ fontFamily: fonts.semibold, color: t.accentText }}
+            >
               Sign in
             </Link>
           </Text>
-        </Card>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

@@ -1,7 +1,9 @@
-import React, { useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Image, Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { api, filePart, type ApiItem, type ExtractionResult } from "@/lib/api";
+import type { PendingPhoto } from "@/lib/add-flow";
 import {
   CATEGORIES,
   CATEGORY_LABELS,
@@ -9,8 +11,16 @@ import {
   WARRANTY_TYPE_LABELS,
 } from "@/lib/constants";
 import { addMonthsToDateString, DATE_RE, toDateInputValue } from "@/lib/format";
-import { colors, radius } from "@/lib/theme";
-import { Button, Card, ChipRow, Field, SectionTitle } from "./ui";
+import { fonts, ink } from "@/lib/theme";
+import { useTheme } from "@/lib/theme-context";
+import {
+  AddTile,
+  ChipRow,
+  Field,
+  Mono,
+  Pill,
+  SectionLabel,
+} from "./ui";
 
 export interface ItemFormValues {
   brand: string;
@@ -46,13 +56,6 @@ const EMPTY: ItemFormValues = {
   notes: "",
 };
 
-interface PhotoSlot {
-  key: string;
-  assetType: string;
-  label: string;
-  uri: string | null;
-}
-
 export function itemToFormValues(item: ApiItem): ItemFormValues {
   return {
     brand: item.brand,
@@ -72,58 +75,40 @@ export function itemToFormValues(item: ApiItem): ItemFormValues {
   };
 }
 
-async function pickImage(fromCamera: boolean): Promise<string | null> {
-  const options: ImagePicker.ImagePickerOptions = {
-    mediaTypes: "images",
-    quality: 0.5,
-    allowsEditing: false,
-  };
-  let result: ImagePicker.ImagePickerResult;
-  if (fromCamera) {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Camera access needed", "Allow camera access in Settings to photograph receipts.");
-      return null;
-    }
-    result = await ImagePicker.launchCameraAsync(options);
-  } else {
-    result = await ImagePicker.launchImageLibraryAsync(options);
-  }
-  if (result.canceled || !result.assets?.[0]) return null;
-  return result.assets[0].uri;
-}
+const PHOTO_LABELS: Record<string, string> = {
+  RECEIPT: "receipt",
+  SERIAL_STICKER: "serial",
+  PRODUCT_PHOTO: "product",
+  OTHER: "photo",
+};
 
 export function ItemForm({
   mode,
   itemId,
   initialValues,
+  initialPhotos = [],
+  initialSerial = null,
   defaultCurrency = "USD",
+  autoExtract = false,
   onSaved,
 }: {
   mode: "create" | "edit";
   itemId?: string;
   initialValues?: ItemFormValues;
+  initialPhotos?: PendingPhoto[];
+  initialSerial?: string | null;
   defaultCurrency?: string;
+  autoExtract?: boolean;
   onSaved: (item: ApiItem) => void;
 }) {
+  const { t } = useTheme();
   const [values, setValues] = useState<ItemFormValues>({
     ...EMPTY,
     currency: defaultCurrency,
     ...(initialValues ?? {}),
+    ...(initialSerial ? { serialNumber: initialSerial } : {}),
   });
-  const [slots, setSlots] = useState<PhotoSlot[]>(
-    mode === "create"
-      ? [
-          { key: "receipt", assetType: "RECEIPT", label: "Receipt", uri: null },
-          {
-            key: "serial",
-            assetType: "SERIAL_STICKER",
-            label: "Serial sticker",
-            uri: null,
-          },
-        ]
-      : []
-  );
+  const [photos, setPhotos] = useState<PendingPhoto[]>(initialPhotos);
   const [confidence, setConfidence] = useState<
     Record<string, "high" | "medium" | "low">
   >({});
@@ -133,11 +118,9 @@ export function ItemForm({
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const autoRan = useRef(false);
 
-  function set<K extends keyof ItemFormValues>(
-    key: K,
-    value: ItemFormValues[K]
-  ) {
+  function set<K extends keyof ItemFormValues>(key: K, value: ItemFormValues[K]) {
     setValues((v) => {
       const next = { ...v, [key]: value };
       if (
@@ -154,86 +137,96 @@ export function ItemForm({
     });
   }
 
-  function choosePhoto(slotKey: string) {
+  const runExtraction = useCallback(
+    async (list: PendingPhoto[]) => {
+      if (list.length === 0) {
+        Alert.alert("Add a photo first", "Attach the receipt or serial sticker, then extract.");
+        return;
+      }
+      setExtracting(true);
+      try {
+        const fd = new FormData();
+        list.slice(0, 4).forEach((p, i) => fd.append("images", filePart(p.uri, `photo-${i}.jpg`)));
+        const { result, mock } = await api<{ result: ExtractionResult; mock: boolean }>(
+          "/api/extract",
+          { method: "POST", body: fd }
+        );
+        const months = result.estimatedWarrantyMonths ?? 12;
+        const assumed = result.warrantyAssumed || result.estimatedWarrantyMonths === null;
+        setValues((v) => {
+          const next: ItemFormValues = {
+            ...v,
+            brand: result.brand ?? v.brand,
+            modelName: result.modelName ?? v.modelName,
+            category: result.suggestedCategory ?? v.category,
+            serialNumber: v.serialNumber || (result.serialNumber ?? ""),
+            purchaseDate: result.purchaseDate ?? v.purchaseDate,
+            purchasePrice:
+              result.purchasePrice !== null ? String(result.purchasePrice) : v.purchasePrice,
+            currency: result.currency ?? v.currency,
+            storeName: result.storeName ?? v.storeName,
+            warrantyDurationMonths: String(months),
+            warrantyAssumed: assumed,
+          };
+          next.warrantyExpirationDate =
+            DATE_RE.test(next.purchaseDate) && months > 0
+              ? addMonthsToDateString(next.purchaseDate, months)
+              : "";
+          return next;
+        });
+        setConfidence(result.confidence ?? {});
+        setExpiryTouched(false);
+        setExtracted(true);
+        if (mock) {
+          Alert.alert(
+            "Demo extraction",
+            "No AI key is configured on the server, so this is sample data. Review before saving."
+          );
+        }
+      } catch (e) {
+        Alert.alert(
+          "Extraction failed",
+          e instanceof Error ? e.message : "Fill the form manually or try again."
+        );
+      } finally {
+        setExtracting(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (autoExtract && initialPhotos.length > 0 && !autoRan.current) {
+      autoRan.current = true;
+      runExtraction(initialPhotos);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function addPhoto() {
     Alert.alert("Add photo", undefined, [
       {
         text: "Take photo",
         onPress: async () => {
-          const uri = await pickImage(true);
-          if (uri)
-            setSlots((s) => s.map((x) => (x.key === slotKey ? { ...x, uri } : x)));
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) return;
+          const r = await ImagePicker.launchCameraAsync({ mediaTypes: "images", quality: 0.55 });
+          if (!r.canceled && r.assets?.[0]) {
+            setPhotos((p) => [...p, { uri: r.assets[0].uri, assetType: "OTHER" }]);
+          }
         },
       },
       {
         text: "Choose from library",
         onPress: async () => {
-          const uri = await pickImage(false);
-          if (uri)
-            setSlots((s) => s.map((x) => (x.key === slotKey ? { ...x, uri } : x)));
+          const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", quality: 0.55 });
+          if (!r.canceled && r.assets?.[0]) {
+            setPhotos((p) => [...p, { uri: r.assets[0].uri, assetType: "OTHER" }]);
+          }
         },
       },
       { text: "Cancel", style: "cancel" },
     ]);
-  }
-
-  async function runExtraction() {
-    const withPhoto = slots.filter((s) => s.uri);
-    if (withPhoto.length === 0) {
-      Alert.alert("Add a photo first", "Photograph the receipt or serial sticker, then extract.");
-      return;
-    }
-    setExtracting(true);
-    try {
-      const fd = new FormData();
-      withPhoto.forEach((s, i) =>
-        fd.append("images", filePart(s.uri!, `photo-${i}.jpg`))
-      );
-      const { result, mock } = await api<{
-        result: ExtractionResult;
-        mock: boolean;
-      }>("/api/extract", { method: "POST", body: fd });
-
-      const months = result.estimatedWarrantyMonths ?? 12;
-      const assumed =
-        result.warrantyAssumed || result.estimatedWarrantyMonths === null;
-
-      setValues((v) => {
-        const next: ItemFormValues = {
-          ...v,
-          brand: result.brand ?? v.brand,
-          modelName: result.modelName ?? v.modelName,
-          category: result.suggestedCategory ?? v.category,
-          serialNumber: result.serialNumber ?? v.serialNumber,
-          purchaseDate: result.purchaseDate ?? v.purchaseDate,
-          purchasePrice:
-            result.purchasePrice !== null
-              ? String(result.purchasePrice)
-              : v.purchasePrice,
-          currency: result.currency ?? v.currency,
-          storeName: result.storeName ?? v.storeName,
-          warrantyDurationMonths: String(months),
-          warrantyAssumed: assumed,
-        };
-        next.warrantyExpirationDate =
-          DATE_RE.test(next.purchaseDate) && months > 0
-            ? addMonthsToDateString(next.purchaseDate, months)
-            : "";
-        return next;
-      });
-      setConfidence(result.confidence ?? {});
-      setExpiryTouched(false);
-      setExtracted(true);
-      if (mock) {
-        Alert.alert(
-          "Demo extraction",
-          "No AI key is configured on the server, so this is sample data. Review and edit before saving."
-        );
-      }
-    } catch (e) {
-      Alert.alert("Extraction failed", e instanceof Error ? e.message : "Try again or fill the form manually.");
-    } finally {
-      setExtracting(false);
-    }
   }
 
   async function save() {
@@ -250,19 +243,16 @@ export function ItemForm({
         return;
       }
     }
-
     setSaving(true);
     try {
       const fd = new FormData();
       for (const [k, v] of Object.entries(values)) {
         fd.append(k, typeof v === "boolean" ? (v ? "true" : "") : v);
       }
-      for (const slot of slots) {
-        if (slot.uri) {
-          fd.append("assetFile", filePart(slot.uri, `${slot.key}.jpg`));
-          fd.append("assetType", slot.assetType);
-        }
-      }
+      photos.forEach((p, i) => {
+        fd.append("assetFile", filePart(p.uri, `${PHOTO_LABELS[p.assetType] ?? "photo"}-${i}.jpg`));
+        fd.append("assetType", p.assetType);
+      });
       const { item } = await api<{ item: ApiItem }>(
         mode === "create" ? "/api/items" : `/api/items/${itemId}`,
         { method: mode === "create" ? "POST" : "PATCH", body: fd }
@@ -281,45 +271,75 @@ export function ItemForm({
       : undefined;
 
   return (
-    <View style={{ gap: 16 }}>
+    <View style={{ gap: 22 }}>
       {mode === "create" && (
-        <Card>
-          <SectionTitle>Smart upload</SectionTitle>
-          <Text style={{ color: colors.muted, fontSize: 13 }}>
-            Snap the receipt and serial sticker — AI fills in the form. Or skip
-            and type everything below.
-          </Text>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            {slots.map((slot) => (
+        <View style={{ gap: 12 }}>
+          <SectionLabel>Proof</SectionLabel>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+            {photos.map((p, i) => (
               <Pressable
-                key={slot.key}
-                onPress={() => choosePhoto(slot.key)}
-                style={styles.slot}
+                key={`${p.uri}-${i}`}
+                onLongPress={() =>
+                  Alert.alert("Remove photo?", undefined, [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Remove",
+                      style: "destructive",
+                      onPress: () => setPhotos((list) => list.filter((_, j) => j !== i)),
+                    },
+                  ])
+                }
+                style={{ width: 98, gap: 4 }}
               >
-                {slot.uri ? (
-                  <Image source={{ uri: slot.uri }} style={styles.slotImage} />
-                ) : (
-                  <Text style={styles.slotHint}>＋</Text>
-                )}
-                <Text style={styles.slotLabel}>{slot.label}</Text>
+                <Image
+                  source={{ uri: p.uri }}
+                  style={{ width: 98, height: 72, borderRadius: 14, backgroundColor: ink.placeholder }}
+                />
+                <Mono size={9} color={ink.placeholderText}>
+                  {PHOTO_LABELS[p.assetType] ?? "photo"}.jpg
+                </Mono>
               </Pressable>
             ))}
+            <AddTile width={98} height={72} onPress={addPhoto} />
           </View>
-          <Button
-            title={extracting ? "Reading photos…" : "✨ Extract details with AI"}
-            variant="secondary"
+          <Pill
+            label={extracting ? "Reading your photos…" : "Extract details with AI"}
+            icon={
+              extracting ? undefined : (
+                <Ionicons name="sparkles-outline" size={17} color={t.onAccent} />
+              )
+            }
             loading={extracting}
-            disabled={!slots.some((s) => s.uri)}
-            onPress={runExtraction}
+            disabled={photos.length === 0}
+            height={50}
+            onPress={() => runExtraction(photos)}
           />
-        </Card>
+        </View>
       )}
 
       {extracted && (
-        <View style={styles.notice}>
-          <Text style={{ color: colors.warning, fontSize: 13 }}>
-            AI extraction is an assistant, not an authority — review every
-            field before saving.
+        <View
+          style={{
+            backgroundColor: ink.card,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: ink.cardBorder,
+            padding: 14,
+            flexDirection: "row",
+            gap: 10,
+          }}
+        >
+          <Ionicons name="sparkles-outline" size={16} color={t.accentText} />
+          <Text
+            style={{
+              flex: 1,
+              fontFamily: fonts.regular,
+              fontSize: 13,
+              lineHeight: 19,
+              color: ink.textSecondary,
+            }}
+          >
+            AI filled this in — review every field before saving.
             {values.warrantyAssumed
               ? " No warranty length was visible, so 12 months is suggested (assumed)."
               : ""}
@@ -327,24 +347,26 @@ export function ItemForm({
         </View>
       )}
 
-      <Card>
-        <SectionTitle>Product</SectionTitle>
+      <View style={{ gap: 14 }}>
+        <SectionLabel>Product</SectionLabel>
         <Field
           label="Brand *"
           hint={flag("brand")}
           value={values.brand}
-          onChangeText={(t) => set("brand", t)}
-          placeholder="Samsung"
+          onChangeText={(v) => set("brand", v)}
+          placeholder="LG"
         />
         <Field
           label="Model *"
           hint={flag("modelName")}
           value={values.modelName}
-          onChangeText={(t) => set("modelName", t)}
-          placeholder="WW90T534DAW"
+          onChangeText={(v) => set("modelName", v)}
+          placeholder={'C3 OLED 55"'}
         />
-        <View style={{ gap: 6 }}>
-          <Text style={styles.groupLabel}>Category</Text>
+        <View style={{ gap: 7 }}>
+          <Text style={{ fontFamily: fonts.semibold, fontSize: 13, color: ink.ink }}>
+            Category
+          </Text>
           <ChipRow
             options={CATEGORIES}
             value={values.category as (typeof CATEGORIES)[number]}
@@ -356,26 +378,27 @@ export function ItemForm({
           label="Serial number"
           hint={flag("serialNumber")}
           value={values.serialNumber}
-          onChangeText={(t) => set("serialNumber", t)}
-          placeholder="S/N on the product sticker"
+          onChangeText={(v) => set("serialNumber", v)}
+          placeholder="S/N on the sticker"
           autoCapitalize="characters"
+          style={{ fontFamily: fonts.mono, letterSpacing: 1 }}
         />
         <Field
           label="Notes"
           value={values.notes}
-          onChangeText={(t) => set("notes", t)}
+          onChangeText={(v) => set("notes", v)}
           placeholder="Support phone, where it's installed…"
           multiline
         />
-      </Card>
+      </View>
 
-      <Card>
-        <SectionTitle>Purchase</SectionTitle>
+      <View style={{ gap: 14 }}>
+        <SectionLabel>Purchase</SectionLabel>
         <Field
           label="Purchase date"
           hint={flag("purchaseDate")}
           value={values.purchaseDate}
-          onChangeText={(t) => set("purchaseDate", t)}
+          onChangeText={(v) => set("purchaseDate", v)}
           placeholder="YYYY-MM-DD"
           keyboardType="numbers-and-punctuation"
         />
@@ -383,7 +406,7 @@ export function ItemForm({
           label="Store"
           hint={flag("storeName")}
           value={values.storeName}
-          onChangeText={(t) => set("storeName", t)}
+          onChangeText={(v) => set("storeName", v)}
           placeholder="Where you bought it"
         />
         <View style={{ flexDirection: "row", gap: 10 }}>
@@ -392,7 +415,7 @@ export function ItemForm({
               label="Price"
               hint={flag("purchasePrice")}
               value={values.purchasePrice}
-              onChangeText={(t) => set("purchasePrice", t)}
+              onChangeText={(v) => set("purchasePrice", v)}
               placeholder="0.00"
               keyboardType="decimal-pad"
             />
@@ -401,19 +424,20 @@ export function ItemForm({
             <Field
               label="Currency"
               value={values.currency}
-              onChangeText={(t) => set("currency", t.toUpperCase())}
-              placeholder="USD"
+              onChangeText={(v) => set("currency", v.toUpperCase())}
               maxLength={3}
               autoCapitalize="characters"
             />
           </View>
         </View>
-      </Card>
+      </View>
 
-      <Card>
-        <SectionTitle>Warranty</SectionTitle>
-        <View style={{ gap: 6 }}>
-          <Text style={styles.groupLabel}>Type</Text>
+      <View style={{ gap: 14 }}>
+        <SectionLabel>Warranty</SectionLabel>
+        <View style={{ gap: 7 }}>
+          <Text style={{ fontFamily: fonts.semibold, fontSize: 13, color: ink.ink }}>
+            Type
+          </Text>
           <ChipRow
             options={WARRANTY_TYPES}
             value={values.warrantyType as (typeof WARRANTY_TYPES)[number]}
@@ -424,7 +448,7 @@ export function ItemForm({
         <Field
           label="Provider"
           value={values.warrantyProvider}
-          onChangeText={(t) => set("warrantyProvider", t)}
+          onChangeText={(v) => set("warrantyProvider", v)}
           placeholder="Who honours the claim"
         />
         <View style={{ flexDirection: "row", gap: 10 }}>
@@ -433,8 +457,8 @@ export function ItemForm({
               label="Months"
               hint={values.warrantyAssumed ? "assumed" : flag("estimatedWarrantyMonths")}
               value={values.warrantyDurationMonths}
-              onChangeText={(t) => {
-                set("warrantyDurationMonths", t);
+              onChangeText={(v) => {
+                set("warrantyDurationMonths", v);
                 if (values.warrantyAssumed) set("warrantyAssumed", false);
               }}
               placeholder="12"
@@ -445,66 +469,24 @@ export function ItemForm({
             <Field
               label="Expires on"
               value={values.warrantyExpirationDate}
-              onChangeText={(t) => {
+              onChangeText={(v) => {
                 setExpiryTouched(true);
-                set("warrantyExpirationDate", t);
+                set("warrantyExpirationDate", v);
               }}
               placeholder="YYYY-MM-DD"
               keyboardType="numbers-and-punctuation"
             />
           </View>
         </View>
-      </Card>
+      </View>
 
-      <Button
-        title={saving ? "Saving…" : mode === "create" ? "Save to vault" : "Save changes"}
+      <Pill
+        label={saving ? "Saving…" : mode === "create" ? "Save to vault" : "Save changes"}
+        variant="ink"
+        arrow
         loading={saving}
         onPress={save}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  slot: {
-    flex: 1,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    backgroundColor: colors.background,
-    minHeight: 120,
-  },
-  slotImage: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 24,
-    width: "100%",
-  },
-  slotHint: { fontSize: 28, color: colors.muted },
-  slotLabel: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    textAlign: "center",
-    paddingVertical: 4,
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.foreground,
-    backgroundColor: colors.card,
-  },
-  notice: {
-    backgroundColor: colors.warningSoft,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: "#f0dcae",
-    padding: 12,
-  },
-  groupLabel: { fontSize: 13, fontWeight: "600", color: colors.foreground },
-});

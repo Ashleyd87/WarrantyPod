@@ -56,7 +56,12 @@ export type ClaimInput = z.infer<typeof claimSchema>;
 export const settingsSchema = z.object({
   reminderLeadDays: z.coerce.number().int().min(1).max(365),
   currency: z.string().trim().length(3).toUpperCase(),
+  // Optional so clients that don't send it never reset it.
+  theme: z.enum(["violet", "lime", "mono"]).optional(),
 });
+
+/** REST PATCH accepts any subset (e.g. theme-only from the mobile picker). */
+export const settingsPatchSchema = settingsSchema.partial();
 
 /** Shape the LLM extraction must return (also used to validate mock mode). */
 export const extractionSchema = z.object({

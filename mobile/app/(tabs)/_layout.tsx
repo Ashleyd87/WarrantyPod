@@ -1,71 +1,39 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Redirect, Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { api, type ApiSettings } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
-import { colors } from "@/lib/theme";
+import { ink } from "@/lib/theme";
+import { useTheme } from "@/lib/theme-context";
+import { TabBar } from "@/components/TabBar";
 import { LoadingScreen } from "@/components/ui";
 
 export default function TabsLayout() {
   const { data: session, isPending } = authClient.useSession();
+  const { syncFromServer } = useTheme();
+
+  // Adopt the account's stored theme once signed in.
+  useEffect(() => {
+    if (session) {
+      api<{ settings: ApiSettings }>("/api/settings")
+        .then((d) => syncFromServer(d.settings.theme))
+        .catch(() => {});
+    }
+  }, [session, syncFromServer]);
 
   if (isPending) return <LoadingScreen />;
-  if (!session) return <Redirect href="/login" />;
+  if (!session) return <Redirect href="/welcome" />;
 
   return (
     <Tabs
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: colors.card },
-        sceneStyle: { backgroundColor: colors.background },
+        sceneStyle: { backgroundColor: ink.paper },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Dashboard",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="vault"
-        options={{
-          title: "Vault",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cube-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: "Add",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size + 4} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="alerts"
-        options={{
-          title: "Alerts",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: "Settings",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
-          ),
-        }}
-      />
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="items" />
+      <Tabs.Screen name="claims" />
     </Tabs>
   );
 }
