@@ -65,22 +65,35 @@ export default function LoginScreen() {
             />
           </View>
           <Pill label="Sign in" variant="ink" arrow loading={loading} onPress={submit} />
-          <Text
-            style={{
-              fontFamily: fonts.regular,
-              fontSize: 13.5,
-              color: ink.textSecondary,
-              textAlign: "center",
-            }}
-          >
-            No account?{" "}
-            <Link
-              href="/signup"
-              style={{ fontFamily: fonts.semibold, color: t.accentText }}
+          <View style={{ gap: 10 }}>
+            <Text
+              style={{
+                fontFamily: fonts.regular,
+                fontSize: 13.5,
+                color: ink.textSecondary,
+                textAlign: "center",
+              }}
             >
-              Create one
+              No account?{" "}
+              <Link
+                href="/signup"
+                style={{ fontFamily: fonts.semibold, color: t.accentText }}
+              >
+                Create one
+              </Link>
+            </Text>
+            <Link
+              href="/forgot-password"
+              style={{
+                fontFamily: fonts.semibold,
+                fontSize: 13.5,
+                color: ink.textSecondary,
+                textAlign: "center",
+              }}
+            >
+              Forgot password?
             </Link>
-          </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

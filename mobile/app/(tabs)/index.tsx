@@ -50,6 +50,7 @@ export default function HomeScreen() {
   const { data: session } = authClient.useSession();
   const [items, setItems] = useState<ApiItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -59,6 +60,18 @@ export default function HomeScreen() {
       // keep last data
     }
   }, []);
+
+  async function loadSamples() {
+    setSeeding(true);
+    try {
+      await api("/api/seed", { method: "POST" });
+      await load();
+    } catch {
+      // ignore
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -207,6 +220,17 @@ export default function HomeScreen() {
                 height={50}
                 onPress={() => router.push("/add")}
               />
+              <Pressable onPress={loadSamples} disabled={seeding} hitSlop={8}>
+                <Text
+                  style={{
+                    fontFamily: fonts.semibold,
+                    fontSize: 13.5,
+                    color: t.accentText,
+                  }}
+                >
+                  {seeding ? "Adding samples…" : "or load sample products"}
+                </Text>
+              </Pressable>
             </Card>
           ) : (
             <ListGroup>
