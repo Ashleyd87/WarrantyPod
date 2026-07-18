@@ -17,7 +17,11 @@
     },
     "android": {
       "package": "com.ashley.warrantyvault",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -37,6 +41,13 @@
           "cameraPermission": "Warranty Vault uses the camera to scan serial stickers, receipts and product photos."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "68d06ed8-09a3-4465-ae03-cea4a2a481ff"
+      }
+    },
+    "owner": "ashleyd87"
   }
 }
