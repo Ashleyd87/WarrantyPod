@@ -133,6 +133,10 @@ export async function GET(
       { size: 12, font: bold }
     );
     y -= 16;
+    if (latestClaim.providerContact) {
+      drawText(`Submit to: ${latestClaim.providerContact}`, { size: 10 });
+      y -= 14;
+    }
     for (const line of wrapText(latestClaim.issueDescription, 90)) {
       drawText(line, { size: 10 });
       y -= 14;

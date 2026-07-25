@@ -1,7 +1,9 @@
 import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +15,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { Directory, File, Paths } from "expo-file-system";
+import * as MailComposer from "expo-mail-composer";
 import * as Sharing from "expo-sharing";
 import { api, apiRaw, type ApiClaim, type ApiItem } from "@/lib/api";
 import { CLAIM_STATUSES, CLAIM_STATUS_LABELS } from "@/lib/constants";
@@ -24,12 +27,26 @@ import {
   Chip,
   ChipRow,
   CircleBtn,
+  Field,
   ListGroup,
   LoadingScreen,
   Mono,
   Pill,
   SectionLabel,
 } from "@/components/ui";
+
+interface ClaimContactInfo {
+  kind: "MANUFACTURER" | "RETAILER";
+  name: string;
+  displayName: string;
+  email: string | null;
+  url: string | null;
+  phone: string | null;
+  source: string;
+  notes: string | null;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const ASSET_ICONS: Record<string, React.ReactNode> = {
   RECEIPT: <Feather name="file-text" size={18} color={ink.ink} />,
@@ -59,7 +76,37 @@ export default function ClaimBuilderScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [issue, setIssue] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [emailing, setEmailing] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [contacts, setContacts] = useState<{
+    manufacturer: ClaimContactInfo | null;
+    retailer: ClaimContactInfo | null;
+  } | null>(null);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [sendTo, setSendTo] = useState("");
+
+  const fetchContacts = useCallback(async (it: ApiItem) => {
+    setContactsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (it.brand) params.set("brand", it.brand);
+      if (it.storeName) params.set("store", it.storeName);
+      const d = await api<{
+        manufacturer: ClaimContactInfo | null;
+        retailer: ClaimContactInfo | null;
+      }>(`/api/claim-contacts?${params.toString()}`);
+      setContacts(d);
+      // Default the claim email to the manufacturer's, unless the user
+      // already saved one on the open claim.
+      setSendTo(
+        (prev) => prev || d.manufacturer?.email || d.retailer?.email || ""
+      );
+    } catch {
+      setContacts({ manufacturer: null, retailer: null });
+    } finally {
+      setContactsLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -68,13 +115,17 @@ export default function ClaimBuilderScreen() {
       if (!loaded) {
         setSelected(new Set(data.item.assets.map((a) => a.id)));
         const open = data.item.claims.find((c) => OPEN.includes(c.status));
-        if (open) setIssue(open.issueDescription);
+        if (open) {
+          setIssue(open.issueDescription);
+          if (open.providerContact) setSendTo(open.providerContact);
+        }
         setLoaded(true);
+        fetchContacts(data.item);
       }
     } catch {
       router.back();
     }
-  }, [id, router, loaded]);
+  }, [id, router, loaded, fetchContacts]);
 
   useFocusEffect(
     useCallback(() => {
@@ -102,44 +153,108 @@ export default function ClaimBuilderScreen() {
   async function ensureClaim(): Promise<void> {
     const text = issue.trim();
     if (!text) return;
+    const contact = sendTo.trim() || null;
     if (openClaim) {
-      if (openClaim.issueDescription !== text) {
+      if (
+        openClaim.issueDescription !== text ||
+        (openClaim.providerContact ?? null) !== contact
+      ) {
         await api(`/api/claims/${openClaim.id}`, {
           method: "PATCH",
-          body: JSON.stringify({ issueDescription: text, status: openClaim.status }),
+          body: JSON.stringify({
+            issueDescription: text,
+            providerContact: contact,
+            status: openClaim.status,
+          }),
         });
       }
     } else {
       await api(`/api/items/${item!.id}/claims`, {
         method: "POST",
-        body: JSON.stringify({ issueDescription: text, status: "DRAFT" }),
+        body: JSON.stringify({
+          issueDescription: text,
+          providerContact: contact,
+          status: "DRAFT",
+        }),
       });
     }
   }
 
-  async function exportPdf(share: boolean) {
+  async function buildPdfFile(): Promise<File> {
+    await ensureClaim();
+    const assetsParam = [...selected].join(",");
+    const res = await apiRaw(
+      `/api/items/${item!.id}/claim-package?assets=${encodeURIComponent(assetsParam)}`
+    );
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const dir = new Directory(Paths.cache, "exports");
+    if (!dir.exists) dir.create();
+    const file = new File(dir, "claim-package.pdf");
+    if (file.exists) file.delete();
+    file.create();
+    file.write(bytes);
+    return file;
+  }
+
+  async function exportPdf() {
     setExporting(true);
     try {
-      await ensureClaim();
-      const assetsParam = [...selected].join(",");
-      const res = await apiRaw(
-        `/api/items/${item!.id}/claim-package?assets=${encodeURIComponent(assetsParam)}`
-      );
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      const dir = new Directory(Paths.cache, "exports");
-      if (!dir.exists) dir.create();
-      const file = new File(dir, "claim-package.pdf");
-      if (file.exists) file.delete();
-      file.create();
-      file.write(bytes);
-      if (share) {
-        await Sharing.shareAsync(file.uri, { mimeType: "application/pdf" });
-      }
+      const file = await buildPdfFile();
+      await Sharing.shareAsync(file.uri, { mimeType: "application/pdf" });
       load();
     } catch (e) {
       Alert.alert("Export failed", e instanceof Error ? e.message : "Try again.");
     } finally {
       setExporting(false);
+    }
+  }
+
+  /** Compose a ready-to-send claim email with the PDF attached. */
+  async function emailClaim() {
+    const to = sendTo.trim();
+    if (to && !EMAIL_RE.test(to)) {
+      Alert.alert("Check the claim email", `"${to}" doesn't look like an email address.`);
+      return;
+    }
+    setEmailing(true);
+    try {
+      const file = await buildPdfFile();
+      const canMail = await MailComposer.isAvailableAsync();
+      if (!canMail) {
+        // No mail app — fall back to the share sheet.
+        await Sharing.shareAsync(file.uri, { mimeType: "application/pdf" });
+        return;
+      }
+      const it = item!;
+      const subject = `Warranty claim — ${it.brand} ${it.modelName}${
+        it.serialNumber ? ` (S/N ${it.serialNumber})` : ""
+      }`;
+      const bodyLines = [
+        "Hello,",
+        "",
+        `I'd like to submit a warranty claim for my ${it.brand} ${it.modelName}.`,
+        it.serialNumber ? `Serial number: ${it.serialNumber}` : null,
+        it.purchaseDate
+          ? `Purchased: ${formatDate(it.purchaseDate)}${it.storeName ? ` from ${it.storeName}` : ""}`
+          : null,
+        "",
+        `Issue: ${issue.trim()}`,
+        "",
+        "The full claim package (receipt, serial and photos) is attached as a PDF.",
+        "",
+        "Thank you,",
+      ];
+      await MailComposer.composeAsync({
+        recipients: to ? [to] : undefined,
+        subject,
+        body: bodyLines.filter((l) => l !== null).join("\n"),
+        attachments: [file.uri],
+      });
+      load();
+    } catch (e) {
+      Alert.alert("Email failed", e instanceof Error ? e.message : "Try again.");
+    } finally {
+      setEmailing(false);
     }
   }
 
@@ -351,6 +466,160 @@ export default function ClaimBuilderScreen() {
             />
           </View>
 
+          {/* Send to — manufacturer / retailer claim contacts */}
+          <View style={{ gap: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <SectionLabel>Send to</SectionLabel>
+              <View style={{ flex: 1 }} />
+              {contactsLoading && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                  <ActivityIndicator size="small" color={ink.textSecondary} />
+                  <Text
+                    style={{
+                      fontFamily: fonts.regular,
+                      fontSize: 12.5,
+                      color: ink.textSecondary,
+                    }}
+                  >
+                    Finding claim contacts…
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {contacts && (contacts.manufacturer || contacts.retailer) ? (
+              <ListGroup>
+                {[contacts.manufacturer, contacts.retailer]
+                  .filter((c): c is ClaimContactInfo => c !== null)
+                  .map((c) => {
+                    const chosen =
+                      Boolean(c.email) && sendTo.trim() === c.email;
+                    return (
+                      <Pressable
+                        key={c.kind}
+                        onPress={() => {
+                          if (c.email) setSendTo(c.email);
+                          else if (c.url) Linking.openURL(c.url).catch(() => {});
+                        }}
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingHorizontal: 12,
+                          paddingVertical: 13,
+                          borderRadius: 16,
+                          backgroundColor: pressed
+                            ? ink.pressHighlight
+                            : "transparent",
+                          gap: 13,
+                        })}
+                      >
+                        <View
+                          style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 12,
+                            backgroundColor: ink.paper,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {c.kind === "MANUFACTURER" ? (
+                            <Feather name="tool" size={17} color={ink.ink} />
+                          ) : (
+                            <Feather name="shopping-bag" size={17} color={ink.ink} />
+                          )}
+                        </View>
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Text
+                            style={{
+                              fontFamily: fonts.bold,
+                              fontSize: 14.5,
+                              color: ink.ink,
+                            }}
+                          >
+                            {c.displayName}
+                            <Text
+                              style={{
+                                fontFamily: fonts.regular,
+                                color: ink.textSecondary,
+                              }}
+                            >
+                              {c.kind === "MANUFACTURER"
+                                ? "  · manufacturer"
+                                : "  · retailer"}
+                            </Text>
+                          </Text>
+                          <Text
+                            style={{
+                              fontFamily: fonts.regular,
+                              fontSize: 12,
+                              color: ink.textSecondary,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {c.email ??
+                              (c.url
+                                ? `Claims portal — tap to open${c.phone ? ` · ${c.phone}` : ""}`
+                                : c.phone ?? "No public contact found")}
+                          </Text>
+                        </View>
+                        {c.email ? (
+                          <View
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: 13,
+                              backgroundColor: chosen ? ink.ink : "transparent",
+                              borderWidth: chosen ? 0 : 1.5,
+                              borderColor: ink.chipBorder,
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {chosen && (
+                              <Feather
+                                name="check"
+                                size={14}
+                                color={t.indicatorOnInk}
+                              />
+                            )}
+                          </View>
+                        ) : c.url ? (
+                          <Feather
+                            name="external-link"
+                            size={16}
+                            color={ink.textSecondary}
+                          />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+              </ListGroup>
+            ) : contacts && !contactsLoading ? (
+              <Text
+                style={{
+                  fontFamily: fonts.regular,
+                  fontSize: 13,
+                  lineHeight: 19,
+                  color: ink.textSecondary,
+                }}
+              >
+                No claim contact found for {item.brand}
+                {item.storeName ? ` or ${item.storeName}` : ""} yet — enter the
+                email below and it's saved with this claim.
+              </Text>
+            ) : null}
+
+            <Field
+              label="Claim email"
+              value={sendTo}
+              onChangeText={setSendTo}
+              placeholder="claims@manufacturer.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+          </View>
+
           {/* Claim status (once a claim exists) */}
           {latestClaim && (
             <View style={{ gap: 12 }}>
@@ -382,16 +651,25 @@ export default function ClaimBuilderScreen() {
         <View style={{ flexDirection: "row", gap: 12, paddingBottom: 8 }}>
           <CircleBtn
             size={56}
-            icon={<Feather name="mail" size={20} color={ink.ink} />}
-            onPress={() => exportPdf(true)}
+            icon={
+              emailing ? (
+                <ActivityIndicator size="small" color={ink.ink} />
+              ) : (
+                <Feather name="mail" size={20} color={ink.ink} />
+              )
+            }
+            onPress={() => {
+              if (!emailing && !exporting && selected.size > 0 && issue.trim())
+                emailClaim();
+            }}
           />
           <Pill
             label={exporting ? "Building…" : "Export claim PDF"}
             arrow
             loading={exporting}
-            disabled={selected.size === 0 || issue.trim().length === 0}
+            disabled={emailing || selected.size === 0 || issue.trim().length === 0}
             style={{ flex: 1 }}
-            onPress={() => exportPdf(true)}
+            onPress={() => exportPdf()}
           />
         </View>
       </SafeAreaView>

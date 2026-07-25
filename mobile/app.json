@@ -40,7 +40,8 @@
         {
           "cameraPermission": "Warranty Vault uses the camera to scan serial stickers, receipts and product photos."
         }
-      ]
+      ],
+      "expo-mail-composer"
     ],
     "extra": {
       "router": {},

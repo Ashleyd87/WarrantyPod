@@ -94,6 +94,26 @@ model UserSettings {
   theme            String @default("lime")
 }
 
+// Shared cache of warranty-claim contact details per manufacturer/retailer.
+// Not user data: looked up once (curated list or AI web search), reused by all.
+model ClaimContact {
+  id        String   @id @default(cuid())
+  // MANUFACTURER | RETAILER
+  kind      String
+  // Normalized lower-case brand or store name, e.g. "lg", "best buy"
+  name      String
+  email     String?
+  url       String?
+  phone     String?
+  // CURATED | AI
+  source    String   @default("AI")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, name])
+}
+
 model ProductItem {
   id                     String    @id @default(cuid())
   userId                 String
