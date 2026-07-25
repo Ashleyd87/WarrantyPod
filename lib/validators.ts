@@ -57,7 +57,7 @@ export const settingsSchema = z.object({
   reminderLeadDays: z.coerce.number().int().min(1).max(365),
   currency: z.string().trim().length(3).toUpperCase(),
   // Optional so clients that don't send it never reset it.
-  theme: z.enum(["violet", "lime", "mono"]).optional(),
+  theme: z.enum(["lime", "periwinkle", "mono", "violet"]).optional(),
 });
 
 /** REST PATCH accepts any subset (e.g. theme-only from the mobile picker). */

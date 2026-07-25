@@ -86,4 +86,7 @@ export const ALLOWED_IMAGE_TYPES = [
   "image/heif",
 ];
 
+// Documents accepted as proof assets / for AI extraction (email import).
+export const ALLOWED_DOCUMENT_TYPES = ["application/pdf"];
+
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;

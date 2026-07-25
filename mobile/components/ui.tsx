@@ -128,7 +128,7 @@ export function Pill({
 }: {
   label: string;
   onPress: () => void;
-  variant?: "accent" | "ink" | "white" | "welcome";
+  variant?: "accent" | "ink" | "white" | "splash";
   height?: number;
   arrow?: boolean;
   icon?: React.ReactNode;
@@ -139,19 +139,19 @@ export function Pill({
   const { t } = useTheme();
   const bg =
     variant === "accent"
-      ? t.accent
+      ? t.accentStrong
       : variant === "ink"
         ? ink.ink
-        : variant === "welcome"
-          ? t.welcomeBtnBg
+        : variant === "splash"
+          ? t.splashBtnBg
           : ink.paper;
   const fg =
     variant === "accent"
       ? t.onAccent
       : variant === "ink"
         ? "#FFFFFF"
-        : variant === "welcome"
-          ? t.welcomeBtnText
+        : variant === "splash"
+          ? t.splashBtnText
           : ink.ink;
   return (
     <Pressable
@@ -214,8 +214,8 @@ export function Chip({
     fg = "#FFFFFF";
     borderWidth = 0;
   } else if (kind === "accent") {
-    bg = onInk ? t.accentOnInkBg : t.accent;
-    fg = onInk ? t.accentOnInkText : t.onAccent;
+    bg = onInk ? t.accentOnInk : t.accentStrong;
+    fg = onInk ? t.onAccentOnInk : t.onAccent;
     borderWidth = 0;
   }
   const pad = size === "sm" ? { h: 10, v: 5 } : { h: 13, v: 7 };
@@ -265,8 +265,8 @@ export function ChipRow<T extends string | number>({
             key={String(opt)}
             onPress={() => onChange(opt)}
             style={({ pressed }) => ({
-              backgroundColor: active ? t.accent : ink.paper,
-              borderColor: active ? t.accent : ink.chipBorder,
+              backgroundColor: active ? t.accentStrong : ink.paper,
+              borderColor: active ? t.accentStrong : ink.chipBorder,
               borderWidth: 1,
               borderRadius: 999,
               paddingHorizontal: 13,
@@ -336,8 +336,6 @@ export function ListGroup({
         {
           backgroundColor: ink.card,
           borderRadius: 22,
-          borderWidth: 1,
-          borderColor: ink.cardBorder,
           padding: 6,
         },
         style,
@@ -464,7 +462,7 @@ export function Avatar({
           width: dot,
           height: dot,
           borderRadius: dot / 2,
-          backgroundColor: t.accent,
+          backgroundColor: t.accentIndicator,
           borderWidth: 2,
           borderColor: ink.paper,
         }}
@@ -491,7 +489,7 @@ export function ProgressBar({ fraction }: { fraction: number }) {
           width: `${Math.min(100, Math.max(3, fraction * 100))}%`,
           height: "100%",
           borderRadius: 999,
-          backgroundColor: t.accent,
+          backgroundColor: t.accentStrong,
         }}
       />
     </View>
@@ -519,7 +517,7 @@ export function Field({
             style={{
               fontFamily: fonts.semibold,
               fontSize: 11.5,
-              color: t.accentText,
+              color: ink.textSecondary,
             }}
           >
             {hint}
@@ -528,7 +526,7 @@ export function Field({
       </View>
       <TextInput
         placeholderTextColor={ink.textMuted}
-        selectionColor={t.accent}
+        selectionColor={ink.ink}
         {...inputProps}
         style={[
           {
@@ -615,7 +613,6 @@ export function AddTile({
 /* ---------- Misc ---------- */
 
 export function LoadingScreen() {
-  const { t } = useTheme();
   return (
     <View
       style={{
@@ -625,10 +622,7 @@ export function LoadingScreen() {
         backgroundColor: ink.paper,
       }}
     >
-      <ActivityIndicator
-        size="large"
-        color={t.accent === "#FFFFFF" ? ink.ink : t.accent}
-      />
+      <ActivityIndicator size="large" color={ink.ink} />
     </View>
   );
 }

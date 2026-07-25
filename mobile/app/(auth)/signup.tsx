@@ -87,7 +87,11 @@ export default function SignupScreen() {
             Already have an account?{" "}
             <Link
               href="/login"
-              style={{ fontFamily: fonts.semibold, color: t.accentText }}
+              style={{
+                fontFamily: fonts.semibold,
+                color: ink.ink,
+                textDecorationLine: "underline",
+              }}
             >
               Sign in
             </Link>

@@ -1,7 +1,7 @@
 // Shared FormData parsing for product items — used by both the web server
 // actions and the mobile REST API so validation can never drift apart.
 import { ASSET_TYPES } from "./constants";
-import { validateImageFile } from "./storage";
+import { validateUploadFile } from "./storage";
 import { productItemSchema } from "./validators";
 
 export const ITEM_FIELDS = [
@@ -46,7 +46,7 @@ export async function collectAssets(formData: FormLike) {
     const file = files[i];
     if (!(file instanceof File) || file.size === 0) continue;
     const type = ASSET_TYPES.includes(types[i] as never) ? types[i] : "OTHER";
-    const problem = validateImageFile(file);
+    const problem = validateUploadFile(file);
     if (problem) throw new Error(`${file.name}: ${problem}`);
     assets.push({ file, type });
   }

@@ -22,7 +22,6 @@ import {
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { formatDate, formatMoney } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
-import { useTheme } from "@/lib/theme-context";
 import {
   AddTile,
   Chip,
@@ -38,7 +37,6 @@ import {
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { t } = useTheme();
   const insets = useSafeAreaInsets();
   const [item, setItem] = useState<ApiItem | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -125,7 +123,7 @@ export default function ItemDetailScreen() {
     <View style={{ flex: 1, backgroundColor: ink.paper }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 130 }}>
         {/* Photo header */}
-        <View style={{ height: 260, backgroundColor: ink.placeholder }}>
+        <View style={{ height: 232, backgroundColor: ink.placeholder }}>
           {hero ? (
             <Pressable
               style={{ flex: 1 }}
@@ -278,17 +276,11 @@ export default function ItemDetailScreen() {
                 }}
               >
                 <SectionLabel>Warranty</SectionLabel>
-                <Text
-                  style={{
-                    fontFamily: fonts.bold,
-                    fontSize: 13,
-                    color: w.status === "EXPIRED" ? ink.textSecondary : t.accentText,
-                  }}
-                >
-                  {w.status === "EXPIRED"
-                    ? "expired"
-                    : `${w.daysRemaining} days left`}
-                </Text>
+                {w.status === "EXPIRED" ? (
+                  <Chip label="expired" size="sm" />
+                ) : (
+                  <Chip label={`${w.daysRemaining} days left`} kind="accent" size="sm" />
+                )}
               </View>
               <ProgressBar fraction={w.fractionElapsed ?? 1} />
               <Text
@@ -324,17 +316,35 @@ export default function ItemDetailScreen() {
                   }
                   style={{ width: 98, gap: 4 }}
                 >
-                  <Image
-                    source={{ uri: fileUrl(a.id), headers: authHeaders() }}
-                    style={{
-                      width: 98,
-                      height: 72,
-                      borderRadius: 14,
-                      backgroundColor: ink.placeholder,
-                    }}
-                  />
-                  <Mono size={9} color={ink.placeholderText}>
-                    {a.type.toLowerCase().replace("_", "-")}.jpg
+                  {a.mimeType.startsWith("image/") ? (
+                    <Image
+                      source={{ uri: fileUrl(a.id), headers: authHeaders() }}
+                      style={{
+                        width: 98,
+                        height: 72,
+                        borderRadius: 14,
+                        backgroundColor: ink.placeholder,
+                      }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 98,
+                        height: 72,
+                        borderRadius: 14,
+                        backgroundColor: ink.placeholder,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <Feather name="file-text" size={18} color={ink.placeholderText} />
+                    </View>
+                  )}
+                  <Mono size={9} color={ink.placeholderText} style={{ maxWidth: 98 }}>
+                    {a.mimeType === "application/pdf"
+                      ? `${a.type.toLowerCase().replace("_", "-")}.pdf`
+                      : `${a.type.toLowerCase().replace("_", "-")}.jpg`}
                   </Mono>
                 </Pressable>
               ))}

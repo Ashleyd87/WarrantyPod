@@ -1,70 +1,101 @@
-// Design tokens — "Utility" kit from the Claude Design handoff.
-// One UI, three user-selectable themes (violet / lime / mono); everything
-// neutral is shared, only the accent token set changes.
+// Design tokens — final Serial Vault design handoff.
+// One UI, three user-selectable themes (lime / periwinkle / mono); everything
+// neutral is shared, only the accent token set changes. A screen never mixes
+// two accents.
 
-export type ThemeName = "violet" | "lime" | "mono";
+export type ThemeName = "lime" | "periwinkle" | "mono";
 
 export interface AccentTokens {
-  /** Fills: chips, nav bar, progress, CTA, avatar dot */
-  accent: string;
-  /** Text/icons on accent */
+  /** Pale accent surface: primary option card, splash pages. */
+  accentSurface: string;
+  /** Hairline for accentSurface (mono's white card needs one; else transparent). */
+  accentSurfaceBorder: string;
+  /** Strong accent: CTAs, chips, progress fill — always on light ground. */
+  accentStrong: string;
+  /** Text/icons on accentStrong. */
   onAccent: string;
-  /** Accent-colored text on white: links, countdowns */
-  accentText: string;
-  /** Bottom-nav inactive icons (on accent bar) */
-  navInactive: string;
-  /** Welcome/splash background */
-  welcomeBg: string;
-  /** Welcome ink (text, logo, barcode art) */
-  welcomeInk: string;
-  welcomeBtnBg: string;
-  welcomeBtnText: string;
-  /** Accent chip rendered ON an ink surface (mono's black-on-black fix) */
-  accentOnInkBg: string;
-  accentOnInkText: string;
-  /** Light tint of accent readable on ink (e.g. "412 days left") */
-  tintOnInk: string;
+  /** Small indicator marks on light ground (avatar notification dot). */
+  accentIndicator: string;
+  /** Accent role rendered ON an ink surface (chips, nav active pill, text). */
+  accentOnInk: string;
+  /** Text/icons on accentOnInk. */
+  onAccentOnInk: string;
+  /** Check glyphs drawn on ink circles (claim proof rows). */
+  indicatorOnInk: string;
+  /** Splash onboarding */
+  splashBg: string;
+  splashInk: string;
+  splashBody: string;
+  splashDotInactive: string;
+  splashBtnBg: string;
+  splashBtnText: string;
+  /** Camera viewfinder ground stripes + accent (brackets, scan line, chips). */
+  cameraGroundA: string;
+  cameraGroundB: string;
+  cameraAccent: string;
+  onCameraAccent: string;
 }
 
 export const THEMES: Record<ThemeName, AccentTokens> = {
-  violet: {
-    accent: "#7361F2",
-    onAccent: "#FFFFFF",
-    accentText: "#7361F2",
-    navInactive: "#FFFFFF",
-    welcomeBg: "#7361F2",
-    welcomeInk: "#FFFFFF",
-    welcomeBtnBg: "#FFFFFF",
-    welcomeBtnText: "#0B0B0B",
-    accentOnInkBg: "#7361F2",
-    accentOnInkText: "#FFFFFF",
-    tintOnInk: "#CBBFFF",
-  },
   lime: {
-    accent: "#BEF264",
-    onAccent: "#131118",
-    accentText: "#557A0D",
-    navInactive: "#0B0B0B",
-    welcomeBg: "#BEF264",
-    welcomeInk: "#0B0B0B",
-    welcomeBtnBg: "#FFFFFF",
-    welcomeBtnText: "#0B0B0B",
-    accentOnInkBg: "#BEF264",
-    accentOnInkText: "#131118",
-    tintOnInk: "#D9F99D",
+    accentSurface: "#F3FEDD",
+    accentSurfaceBorder: "transparent",
+    accentStrong: "#F3FEDD",
+    onAccent: "#0B0B0B",
+    accentIndicator: "#D9F58F",
+    accentOnInk: "#F3FEDD",
+    onAccentOnInk: "#0B0B0B",
+    indicatorOnInk: "#D9F58F",
+    splashBg: "#F3FEDD",
+    splashInk: "#17171C",
+    splashBody: "rgba(23,23,28,0.8)",
+    splashDotInactive: "rgba(23,23,28,0.22)",
+    splashBtnBg: "#17171C",
+    splashBtnText: "#FFFFFF",
+    cameraGroundA: "#17150F",
+    cameraGroundB: "#1E1B14",
+    cameraAccent: "#F3FEDD",
+    onCameraAccent: "#0B0B0B",
+  },
+  periwinkle: {
+    accentSurface: "#C5D3FD",
+    accentSurfaceBorder: "transparent",
+    accentStrong: "#C5D3FD",
+    onAccent: "#0B0B0B",
+    accentIndicator: "#C5D3FD",
+    accentOnInk: "#C5D3FD",
+    onAccentOnInk: "#0B0B0B",
+    indicatorOnInk: "#C5D3FD",
+    splashBg: "#C5D3FD",
+    splashInk: "#17171C",
+    splashBody: "rgba(23,23,28,0.8)",
+    splashDotInactive: "rgba(23,23,28,0.2)",
+    splashBtnBg: "#17171C",
+    splashBtnText: "#FFFFFF",
+    cameraGroundA: "#0F1117",
+    cameraGroundB: "#161A24",
+    cameraAccent: "#C5D3FD",
+    onCameraAccent: "#0B0B0B",
   },
   mono: {
-    accent: "#0B0B0B",
+    accentSurface: "#FFFFFF",
+    accentSurfaceBorder: "#E4E1DA",
+    accentStrong: "#0B0B0B",
     onAccent: "#FFFFFF",
-    accentText: "#17150F",
-    navInactive: "#FFFFFF",
-    welcomeBg: "#FFFFFF",
-    welcomeInk: "#0B0B0B",
-    welcomeBtnBg: "#0B0B0B",
-    welcomeBtnText: "#FFFFFF",
-    accentOnInkBg: "#FFFFFF",
-    accentOnInkText: "#0B0B0B",
-    tintOnInk: "#FFFFFF",
+    accentIndicator: "#0B0B0B",
+    accentOnInk: "#FFFFFF",
+    onAccentOnInk: "#0B0B0B",
+    indicatorOnInk: "#FFFFFF",
+    splashBg: "#FFFFFF",
+    splashInk: "#0B0B0B",
+    splashBody: "#5F5B54",
+    splashDotInactive: "rgba(11,11,11,0.2)",
+    splashBtnBg: "#0B0B0B",
+    splashBtnText: "#FFFFFF",
+    cameraGroundA: "#17150F",
+    cameraGroundB: "#1E1B14",
+    cameraAccent: "#FFFFFF",
+    onCameraAccent: "#0B0B0B",
   },
 };
 
@@ -81,8 +112,9 @@ export const ink = {
   textSecondary: "#8A857D",
   textMuted: "#9A958E",
   chipOutlineText: "#6E695F",
-  onInkSecondary: "rgba(255,255,255,0.62)",
+  onInkSecondary: "rgba(255,255,255,0.6)",
   onInkBorder: "rgba(255,255,255,0.28)",
+  onInkDivider: "rgba(255,255,255,0.12)",
   viewfinder: "#17150F",
   overlayPill: "rgba(255,255,255,0.12)",
   placeholder: "#F1EFEB",
@@ -108,7 +140,13 @@ export const fonts = {
 export const SCREEN_PAD = 22;
 
 export const THEME_LABELS: Record<ThemeName, string> = {
-  violet: "Violet",
   lime: "Lime",
+  periwinkle: "Periwinkle",
   mono: "Mono",
+};
+
+/** Profile swatch fills (each drawn with a 1px rgba(11,11,11,.12) hairline). */
+export const THEME_SWATCHES: Record<Exclude<ThemeName, "mono">, string> = {
+  lime: "#F3FEDD",
+  periwinkle: "#C5D3FD",
 };

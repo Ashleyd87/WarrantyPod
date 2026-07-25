@@ -77,7 +77,11 @@ export default function LoginScreen() {
               No account?{" "}
               <Link
                 href="/signup"
-                style={{ fontFamily: fonts.semibold, color: t.accentText }}
+                style={{
+                  fontFamily: fonts.semibold,
+                  color: ink.ink,
+                  textDecorationLine: "underline",
+                }}
               >
                 Create one
               </Link>

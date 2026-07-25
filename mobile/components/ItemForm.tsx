@@ -329,7 +329,7 @@ export function ItemForm({
             gap: 10,
           }}
         >
-          <Ionicons name="sparkles-outline" size={16} color={t.accentText} />
+          <Ionicons name="sparkles" size={16} color={ink.ink} />
           <Text
             style={{
               flex: 1,

@@ -13,7 +13,6 @@ import { api, type ApiItem } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
 import { formatDate } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
-import { useTheme } from "@/lib/theme-context";
 import {
   Avatar,
   Card,
@@ -46,7 +45,6 @@ const CATEGORY_CARDS = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { t } = useTheme();
   const { data: session } = authClient.useSession();
   const [items, setItems] = useState<ApiItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -186,9 +184,10 @@ export default function HomeScreen() {
             <Pressable onPress={() => router.push("/items?filter=expiring")}>
               <Text
                 style={{
-                  fontFamily: fonts.semibold,
+                  fontFamily: fonts.bold,
                   fontSize: 13,
-                  color: t.accentText,
+                  color: ink.ink,
+                  textDecorationLine: "underline",
                 }}
               >
                 View all
@@ -225,7 +224,8 @@ export default function HomeScreen() {
                   style={{
                     fontFamily: fonts.semibold,
                     fontSize: 13.5,
-                    color: t.accentText,
+                    color: ink.ink,
+                    textDecorationLine: "underline",
                   }}
                 >
                   {seeding ? "Adding samples…" : "or load sample products"}

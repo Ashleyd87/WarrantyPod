@@ -89,8 +89,9 @@ model UserSettings {
   user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   reminderLeadDays Int    @default(30)
   currency         String @default("USD")
-  // App color theme: violet | lime | mono (design-system user preference)
-  theme            String @default("violet")
+  // App color theme: lime | periwinkle | mono (design-system user preference;
+  // legacy rows may still hold "violet", which clients treat as lime)
+  theme            String @default("lime")
 }
 
 model ProductItem {

@@ -142,7 +142,7 @@ export default function AlertsScreen() {
                   <Ionicons
                     name={meta.name as never}
                     size={19}
-                    color={meta.color(t.accentText)}
+                    color={meta.color(ink.ink)}
                     style={{ marginTop: 2 }}
                   />
                   <View style={{ flex: 1, gap: 3 }}>
@@ -164,7 +164,7 @@ export default function AlertsScreen() {
                             width: 8,
                             height: 8,
                             borderRadius: 4,
-                            backgroundColor: t.accent,
+                            backgroundColor: t.accentIndicator,
                           }}
                         />
                       )}

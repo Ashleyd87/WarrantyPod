@@ -1,7 +1,11 @@
 import { randomUUID } from "crypto";
 import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
-import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "./constants";
+import {
+  ALLOWED_DOCUMENT_TYPES,
+  ALLOWED_IMAGE_TYPES,
+  MAX_UPLOAD_BYTES,
+} from "./constants";
 
 // Uploaded receipts/serial photos are PRIVATE (they contain PII) and are only
 // served through the authenticated /api/files/[assetId] route.
@@ -25,6 +29,7 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/webp": ".webp",
   "image/heic": ".heic",
   "image/heif": ".heif",
+  "application/pdf": ".pdf",
 };
 
 function useSupabase(): boolean {
@@ -47,6 +52,18 @@ function serviceHeaders(): Record<string, string> {
 
 export function validateImageFile(file: File): string | null {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type))
+    return `Unsupported file type: ${file.type || "unknown"}`;
+  if (file.size > MAX_UPLOAD_BYTES) return "File is larger than 10 MB";
+  if (file.size === 0) return "File is empty";
+  return null;
+}
+
+/** Images + PDF documents (order confirmations imported as proof assets). */
+export function validateUploadFile(file: File): string | null {
+  if (
+    !ALLOWED_IMAGE_TYPES.includes(file.type) &&
+    !ALLOWED_DOCUMENT_TYPES.includes(file.type)
+  )
     return `Unsupported file type: ${file.type || "unknown"}`;
   if (file.size > MAX_UPLOAD_BYTES) return "File is larger than 10 MB";
   if (file.size === 0) return "File is empty";

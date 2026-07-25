@@ -14,7 +14,14 @@ import * as Sharing from "expo-sharing";
 import { api, apiRaw, type ApiItem, type ApiSettings } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
 import { formatMoney } from "@/lib/format";
-import { fonts, ink, SCREEN_PAD, THEME_LABELS, THEMES, type ThemeName } from "@/lib/theme";
+import {
+  fonts,
+  ink,
+  SCREEN_PAD,
+  THEME_LABELS,
+  THEME_SWATCHES,
+  type ThemeName,
+} from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
 import { Header } from "@/components/Header";
 import {
@@ -93,37 +100,33 @@ export default function ProfileScreen() {
   }
 
   function themeCircle(name: ThemeName) {
-    const tok = THEMES[name];
     const isSelected = themeName === name;
     const isMono = name === "mono";
     return (
-      <Pressable key={name} onPress={() => setTheme(name)} hitSlop={6}>
+      <Pressable
+        key={name}
+        onPress={() => setTheme(name)}
+        hitSlop={6}
+        style={({ pressed }) => ({
+          transform: [{ scale: pressed ? 0.96 : 1 }],
+        })}
+      >
         <View
           style={{
             width: 34,
             height: 34,
             borderRadius: 17,
             overflow: "hidden",
-            borderWidth: name === "lime" ? 1 : isMono ? 1 : 0,
-            borderColor: name === "lime" ? "rgba(11,11,11,0.12)" : ink.controlBorder,
+            borderWidth: 1,
+            borderColor: isMono ? ink.controlBorder : "rgba(11,11,11,0.12)",
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: isMono ? undefined : tok.accent,
-            ...(isSelected && {
-              shadowColor: tok.accent === "#FFFFFF" ? ink.ink : tok.accent,
-              shadowOpacity: 0.9,
-              shadowRadius: 0,
-              shadowOffset: { width: 0, height: 0 },
-            }),
+            backgroundColor: isMono
+              ? undefined
+              : THEME_SWATCHES[name as Exclude<ThemeName, "mono">],
           }}
         >
           {isMono && (
-            <View style={{ flexDirection: "row", width: "100%", height: "100%" }}>
-              <View style={{ flex: 1, backgroundColor: "#0B0B0B" }} />
-              <View style={{ flex: 1, backgroundColor: "#FFFFFF" }} />
-            </View>
-          )}
-          {isSelected && (
             <View
               style={{
                 position: "absolute",
@@ -131,25 +134,30 @@ export default function ProfileScreen() {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                alignItems: "center",
-                justifyContent: "center",
+                flexDirection: "row",
               }}
             >
-              <View
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: "rgba(0,0,0,0.35)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Feather name="check" size={12} color="#FFFFFF" />
-              </View>
+              <View style={{ flex: 1, backgroundColor: "#0B0B0B" }} />
+              <View style={{ flex: 1, backgroundColor: "#FFFFFF" }} />
             </View>
           )}
+          {isSelected && (
+            <Feather
+              name="check"
+              size={15}
+              color={isMono ? "#FFFFFF" : ink.ink}
+              style={
+                isMono
+                  ? {
+                      textShadowColor: "rgba(0,0,0,0.9)",
+                      textShadowRadius: 3,
+                    }
+                  : undefined
+              }
+            />
+          )}
         </View>
+        {/* Selected ring: white gap + ink ring */}
         {isSelected && (
           <View
             style={{
@@ -160,7 +168,7 @@ export default function ProfileScreen() {
               bottom: -5,
               borderRadius: 22,
               borderWidth: 2,
-              borderColor: tok.accent === "#FFFFFF" ? ink.ink : tok.accent,
+              borderColor: ink.ink,
             }}
           />
         )}
@@ -246,7 +254,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
             <View style={{ flexDirection: "row", gap: 14, paddingRight: 4 }}>
-              {(["violet", "lime", "mono"] as ThemeName[]).map(themeCircle)}
+              {(["lime", "periwinkle", "mono"] as ThemeName[]).map(themeCircle)}
             </View>
           </View>
         </View>
@@ -276,6 +284,7 @@ export default function ProfileScreen() {
             <SettingsRow
               icon={<Feather name="log-out" size={19} color={ink.ink} />}
               title="Sign out"
+              chevron={false}
               onPress={async () => {
                 await authClient.signOut();
                 router.replace("/welcome");
@@ -286,7 +295,7 @@ export default function ProfileScreen() {
 
         {/* Footer */}
         <View style={{ alignItems: "center", marginTop: 16 }}>
-          <Mono size={10} color={ink.textMuted} style={{ letterSpacing: 2 }}>
+          <Mono size={10} color={ink.textMuted} style={{ letterSpacing: 1 }}>
             SERIAL VAULT v1.0 · SN 8H24-99401-B
           </Mono>
         </View>
@@ -301,12 +310,14 @@ function SettingsRow({
   sub,
   onPress,
   disabled = false,
+  chevron = true,
 }: {
   icon: React.ReactNode;
   title: string;
   sub?: string;
   onPress?: () => void;
   disabled?: boolean;
+  chevron?: boolean;
 }) {
   return (
     <Pressable
@@ -336,7 +347,7 @@ function SettingsRow({
           </Text>
         ) : null}
       </View>
-      {onPress && !disabled && (
+      {chevron && onPress && !disabled && (
         <Feather name="chevron-right" size={18} color={ink.textSecondary} />
       )}
     </Pressable>

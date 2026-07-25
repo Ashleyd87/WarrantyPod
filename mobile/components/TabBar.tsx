@@ -5,19 +5,22 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
 
-const TAB_META: Record<string, { label: string; icon: (color: string) => React.ReactNode }> = {
+const TAB_META: Record<
+  string,
+  { label: string; icon: (color: string, size: number) => React.ReactNode }
+> = {
   index: {
     label: "Home",
-    icon: (c) => <Feather name="home" size={20} color={c} />,
+    icon: (c, s) => <Feather name="home" size={s} color={c} />,
   },
   items: {
     label: "Items",
-    icon: (c) => <Feather name="grid" size={20} color={c} />,
+    icon: (c, s) => <Feather name="grid" size={s} color={c} />,
   },
   claims: {
     label: "Claims",
-    icon: (c) => (
-      <Ionicons name="shield-checkmark-outline" size={21} color={c} />
+    icon: (c, s) => (
+      <Ionicons name="shield-checkmark-outline" size={s + 1} color={c} />
     ),
   },
 };
@@ -36,7 +39,7 @@ interface TabBarProps {
   };
 }
 
-/** Floating accent pill bar; active tab = white pill with ink icon + label. */
+/** Floating 64px ink pill bar; active tab = accent pill with ink icon + label. */
 export function TabBar({ state, navigation }: TabBarProps) {
   const { t } = useTheme();
   const insets = useSafeAreaInsets();
@@ -46,25 +49,20 @@ export function TabBar({ state, navigation }: TabBarProps) {
       pointerEvents="box-none"
       style={{
         position: "absolute",
-        left: SCREEN_PAD,
-        right: SCREEN_PAD,
-        bottom: Math.max(insets.bottom, 12),
+        left: SCREEN_PAD + 4,
+        right: SCREEN_PAD + 4,
+        bottom: Math.max(insets.bottom, 12) + 10,
       }}
     >
       <View
         style={{
           height: 64,
           borderRadius: 999,
-          backgroundColor: t.accent,
+          backgroundColor: ink.ink,
           padding: 6,
           flexDirection: "row",
           alignItems: "center",
-          // Mono theme: black bar on white screens needs no border; fine.
-          shadowColor: "#000",
-          shadowOpacity: 0.15,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 8,
+          gap: 6,
         }}
       >
         {state.routes.map((route, index) => {
@@ -86,19 +84,24 @@ export function TabBar({ state, navigation }: TabBarProps) {
               <Pressable
                 key={route.key}
                 onPress={onPress}
-                style={{
+                style={({ pressed }) => ({
                   height: 52,
                   borderRadius: 999,
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: t.accentOnInk,
                   paddingHorizontal: 22,
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 9,
-                }}
+                  transform: [{ scale: pressed ? 0.96 : 1 }],
+                })}
               >
-                {meta.icon(ink.ink)}
+                {meta.icon(t.onAccentOnInk, 18)}
                 <Text
-                  style={{ fontFamily: fonts.bold, fontSize: 15, color: ink.ink }}
+                  style={{
+                    fontFamily: fonts.bold,
+                    fontSize: 14,
+                    color: t.onAccentOnInk,
+                  }}
                 >
                   {meta.label}
                 </Text>
@@ -117,7 +120,7 @@ export function TabBar({ state, navigation }: TabBarProps) {
                 opacity: pressed ? 0.7 : 1,
               })}
             >
-              {meta.icon(t.navInactive)}
+              {meta.icon("#FFFFFF", 20)}
             </Pressable>
           );
         })}

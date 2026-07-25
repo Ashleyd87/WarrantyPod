@@ -56,7 +56,8 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
 };
 
 const SYSTEM_PROMPT = `You are a meticulous data-entry assistant for a household warranty vault.
-You are given photos of a purchase receipt and/or a product serial-number sticker.
+You are given photos of a purchase receipt and/or a product serial-number sticker,
+and/or an order-confirmation email (as text, PDF or screenshot).
 Extract only what you can actually read. Use null for anything not visible or ambiguous —
 never invent values. Dates must be YYYY-MM-DD; if the receipt uses DD/MM/YYYY vs MM/DD/YYYY
 and it is ambiguous, pick the interpretation consistent with the store's country and mark
@@ -67,8 +68,23 @@ export function isMockMode(): boolean {
   return !process.env.ANTHROPIC_API_KEY;
 }
 
+export interface ExtractionInputs {
+  /** Photos: receipts, serial stickers, order-confirmation screenshots. */
+  images: { mimeType: string; base64: string }[];
+  /** PDF order confirmations / invoices. */
+  pdfs?: { base64: string }[];
+  /** Raw text of a forwarded/exported order email (.eml or plain text). */
+  emailText?: string | null;
+}
+
 export async function extractFromImages(
   images: { mimeType: string; base64: string }[]
+): Promise<ExtractionResult> {
+  return extractFromInputs({ images });
+}
+
+export async function extractFromInputs(
+  inputs: ExtractionInputs
 ): Promise<ExtractionResult> {
   if (isMockMode()) return mockExtraction();
 
@@ -78,9 +94,9 @@ export async function extractFromImages(
   const content: Anthropic.ContentBlockParam[] = [
     {
       type: "text",
-      text: "Extract the product, purchase and warranty details from these photos.",
+      text: "Extract the product, purchase and warranty details from these documents.",
     },
-    ...images.map(
+    ...inputs.images.map(
       (img): Anthropic.ImageBlockParam => ({
         type: "image",
         source: {
@@ -90,6 +106,24 @@ export async function extractFromImages(
         },
       })
     ),
+    ...(inputs.pdfs ?? []).map(
+      (pdf): Anthropic.DocumentBlockParam => ({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: pdf.base64,
+        },
+      })
+    ),
+    ...(inputs.emailText
+      ? [
+          {
+            type: "text" as const,
+            text: `Order email content:\n\n${inputs.emailText.slice(0, 30_000)}`,
+          },
+        ]
+      : []),
   ];
 
   const response = await anthropic.messages.create({

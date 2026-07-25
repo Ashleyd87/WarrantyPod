@@ -200,7 +200,11 @@ export default function CameraScreen() {
             </Text>
           </View>
           <OverlayCircle onPress={() => setTorch((v) => !v)}>
-            <Feather name="zap" size={18} color={torch ? t.accent : "#FFFFFF"} />
+            <Feather
+              name="zap"
+              size={18}
+              color={torch ? t.cameraAccent : "rgba(255,255,255,0.75)"}
+            />
           </OverlayCircle>
         </View>
 
@@ -214,7 +218,7 @@ export default function CameraScreen() {
                   position: "absolute",
                   width: 36,
                   height: 36,
-                  borderColor: t.accent === ink.ink ? "#FFFFFF" : t.accent,
+                  borderColor: t.cameraAccent,
                   ...(corner === "tl" && {
                     top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 16,
                   }),
@@ -239,8 +243,8 @@ export default function CameraScreen() {
                   top: 8,
                   height: 2.5,
                   borderRadius: 2,
-                  backgroundColor: t.accent === ink.ink ? "#FFFFFF" : t.accent,
-                  shadowColor: t.accent === ink.ink ? "#FFFFFF" : t.accent,
+                  backgroundColor: t.cameraAccent,
+                  shadowColor: t.cameraAccent,
                   shadowOpacity: 0.9,
                   shadowRadius: 8,
                   transform: [
@@ -287,7 +291,7 @@ export default function CameraScreen() {
               </View>
               <View
                 style={{
-                  backgroundColor: t.accent,
+                  backgroundColor: t.accentStrong,
                   borderRadius: 999,
                   paddingHorizontal: 12,
                   paddingVertical: 7,
@@ -331,11 +335,7 @@ export default function CameraScreen() {
                     setDetected(null);
                   }}
                   style={{
-                    backgroundColor: active
-                      ? t.accent === ink.ink
-                        ? "#FFFFFF"
-                        : t.accent
-                      : ink.overlayPill,
+                    backgroundColor: active ? t.cameraAccent : ink.overlayPill,
                     borderRadius: 999,
                     paddingHorizontal: 18,
                     paddingVertical: 11,
@@ -345,11 +345,7 @@ export default function CameraScreen() {
                     style={{
                       fontFamily: fonts.bold,
                       fontSize: 14,
-                      color: active
-                        ? t.accent === ink.ink
-                          ? ink.ink
-                          : t.onAccent
-                        : "#FFFFFF",
+                      color: active ? t.onCameraAccent : "#FFFFFF",
                     }}
                   >
                     {MODE_META[m].label}

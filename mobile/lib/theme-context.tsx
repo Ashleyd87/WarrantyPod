@@ -5,6 +5,13 @@ import { THEMES, type AccentTokens, type ThemeName } from "./theme";
 
 const THEME_KEY = "warranty-vault.theme";
 
+/** Coerce any stored value (incl. the retired "violet") to a valid theme. */
+function normalize(v: string | null | undefined): ThemeName | null {
+  if (v === "lime" || v === "periwinkle" || v === "mono") return v;
+  if (v === "violet") return "lime"; // legacy default from the previous design
+  return null;
+}
+
 interface ThemeContextValue {
   themeName: ThemeName;
   t: AccentTokens;
@@ -16,12 +23,12 @@ interface ThemeContextValue {
 
 function cachedTheme(): ThemeName {
   try {
-    const v = SecureStore.getItem(THEME_KEY);
-    if (v === "violet" || v === "lime" || v === "mono") return v;
+    const v = normalize(SecureStore.getItem(THEME_KEY));
+    if (v) return v;
   } catch {
     // First launch / no secure store — fall through to default.
   }
-  return "violet";
+  return "lime";
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -44,14 +51,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const syncFromServer = useCallback((name: string | undefined) => {
-    if (name === "violet" || name === "lime" || name === "mono") {
+    const v = normalize(name);
+    if (v) {
       setThemeName((current) => {
-        if (current !== name) {
+        if (current !== v) {
           try {
-            SecureStore.setItem(THEME_KEY, name);
+            SecureStore.setItem(THEME_KEY, v);
           } catch {}
         }
-        return name;
+        return v;
       });
     }
   }, []);

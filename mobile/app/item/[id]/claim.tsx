@@ -221,7 +221,7 @@ export default function ClaimBuilderScreen() {
                 onInk
               />
             </View>
-            <View style={{ height: 1, backgroundColor: ink.onInkBorder }} />
+            <View style={{ height: 1, backgroundColor: ink.onInkDivider }} />
             <View
               style={{
                 flexDirection: "row",
@@ -234,7 +234,7 @@ export default function ClaimBuilderScreen() {
               </Mono>
               {w.daysRemaining !== null && w.status !== "EXPIRED" && (
                 <Text
-                  style={{ fontFamily: fonts.bold, fontSize: 13, color: t.tintOnInk }}
+                  style={{ fontFamily: fonts.bold, fontSize: 13, color: t.accentOnInk }}
                 >
                   {w.daysRemaining} days left
                 </Text>
@@ -308,14 +308,16 @@ export default function ClaimBuilderScreen() {
                           width: 26,
                           height: 26,
                           borderRadius: 13,
-                          backgroundColor: on ? t.accent : "transparent",
+                          backgroundColor: on ? ink.ink : "transparent",
                           borderWidth: on ? 0 : 1.5,
                           borderColor: ink.chipBorder,
                           alignItems: "center",
                           justifyContent: "center",
                         }}
                       >
-                        {on && <Feather name="check" size={14} color={t.onAccent} />}
+                        {on && (
+                          <Feather name="check" size={14} color={t.indicatorOnInk} />
+                        )}
                       </View>
                     </Pressable>
                   );
@@ -333,7 +335,7 @@ export default function ClaimBuilderScreen() {
               multiline
               placeholder="Screen flickers on the left edge after ~10 minutes of use. Started July 2."
               placeholderTextColor={ink.textMuted}
-              selectionColor={t.accent}
+              selectionColor={ink.ink}
               style={{
                 borderWidth: 1.5,
                 borderColor: ink.controlBorder,
@@ -387,6 +389,7 @@ export default function ClaimBuilderScreen() {
             label={exporting ? "Building…" : "Export claim PDF"}
             arrow
             loading={exporting}
+            disabled={selected.size === 0 || issue.trim().length === 0}
             style={{ flex: 1 }}
             onPress={() => exportPdf(true)}
           />

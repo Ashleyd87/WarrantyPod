@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { extractFromImages, isMockMode } from "@/lib/extraction";
+import { extractFromInputs, isMockMode } from "@/lib/extraction";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateImageFile } from "@/lib/storage";
+import { MAX_UPLOAD_BYTES } from "@/lib/constants";
 
 export const maxDuration = 60;
 
@@ -44,15 +45,44 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (images.length === 0) {
+  // Email import: PDF order confirmations and .eml / plain-text emails.
+  const documents = formData.getAll("documents") as unknown as File[];
+  const pdfs: { base64: string }[] = [];
+  let emailText: string | null = null;
+  for (const file of documents) {
+    if (!(file instanceof File) || file.size === 0) continue;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: `${file.name}: file is larger than 10 MB` },
+        { status: 400 }
+      );
+    }
+    const isPdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
+    if (isPdf) {
+      pdfs.push({
+        base64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+      });
+    } else {
+      // Treat anything else (message/rfc822, text/plain, unknown) as email text.
+      emailText = [emailText, await file.text()].filter(Boolean).join("\n\n");
+    }
+  }
+
+  if (images.length === 0 && pdfs.length === 0 && !emailText) {
     return NextResponse.json(
-      { error: "Attach at least one photo" },
+      { error: "Attach at least one photo or document" },
       { status: 400 }
     );
   }
 
   try {
-    const result = await extractFromImages(images.slice(0, 4));
+    const result = await extractFromInputs({
+      images: images.slice(0, 4),
+      pdfs: pdfs.slice(0, 2),
+      emailText,
+    });
     return NextResponse.json({ result, mock: isMockMode() });
   } catch (e) {
     console.error("Extraction failed:", e);
