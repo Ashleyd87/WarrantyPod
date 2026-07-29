@@ -21,7 +21,9 @@ export default function TabsLayout() {
   }, [session, syncFromServer]);
 
   if (isPending) return <LoadingScreen />;
-  if (!session) return <Redirect href="/welcome" />;
+  // Gate on the user, not just the session object: a rehydrated-but-incomplete
+  // session would otherwise render screens that read session.user and crash.
+  if (!session?.user) return <Redirect href="/welcome" />;
 
   return (
     <Tabs

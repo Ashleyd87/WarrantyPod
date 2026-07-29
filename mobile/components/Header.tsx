@@ -25,7 +25,7 @@ export function Header({
 }) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
-  const letter = (session?.user.name || session?.user.email || "?").charAt(0);
+  const letter = (session?.user?.name || session?.user?.email || "?").charAt(0);
 
   return (
     <View

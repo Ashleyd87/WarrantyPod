@@ -90,7 +90,7 @@ export default function HomeScreen() {
           (a, b) =>
             (a.warranty.daysRemaining ?? 9e9) - (b.warranty.daysRemaining ?? 9e9)
         );
-  const letter = (session?.user.name || session?.user.email || "?").charAt(0);
+  const letter = (session?.user?.name || session?.user?.email || "?").charAt(0);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: ink.paper }} edges={["top"]}>

@@ -66,7 +66,7 @@ export default function OnboardingScreen() {
   const width = Dimensions.get("window").width;
 
   if (isPending) return <LoadingScreen />;
-  if (session) return <Redirect href="/(tabs)" />;
+  if (session?.user) return <Redirect href="/(tabs)" />;
   // Returning (signed-out) users skip straight to sign-in.
   if (onboarded) return <Redirect href="/login" />;
 

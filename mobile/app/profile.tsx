@@ -77,8 +77,8 @@ export default function ProfileScreen() {
     0
   );
 
-  const name = session?.user.name || "You";
-  const email = session?.user.email ?? "";
+  const name = session?.user?.name || "You";
+  const email = session?.user?.email ?? "";
 
   async function exportCsv() {
     setExporting(true);
