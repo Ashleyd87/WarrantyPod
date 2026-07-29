@@ -10,8 +10,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { api, type ApiItem } from "@/lib/api";
-import { authClient } from "@/lib/auth-client";
-import { formatDate } from "@/lib/format";
+import { useSessionUser } from "@/lib/auth-client";
+import { formatDate, userInitial } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
 import {
   Avatar,
@@ -45,7 +45,7 @@ const CATEGORY_CARDS = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
+  const { user } = useSessionUser();
   const [items, setItems] = useState<ApiItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [seeding, setSeeding] = useState(false);
@@ -90,7 +90,7 @@ export default function HomeScreen() {
           (a, b) =>
             (a.warranty.daysRemaining ?? 9e9) - (b.warranty.daysRemaining ?? 9e9)
         );
-  const letter = (session?.user?.name || session?.user?.email || "?").charAt(0);
+  const letter = userInitial(user);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: ink.paper }} edges={["top"]}>

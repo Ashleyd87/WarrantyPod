@@ -12,8 +12,8 @@ import { Feather } from "@expo/vector-icons";
 import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { api, apiRaw, type ApiItem, type ApiSettings } from "@/lib/api";
-import { authClient } from "@/lib/auth-client";
-import { formatMoney } from "@/lib/format";
+import { authClient, useSessionUser } from "@/lib/auth-client";
+import { formatMoney, userInitial } from "@/lib/format";
 import {
   fonts,
   ink,
@@ -36,7 +36,7 @@ import {
 export default function ProfileScreen() {
   const router = useRouter();
   const { t, themeName, setTheme } = useTheme();
-  const { data: session } = authClient.useSession();
+  const { user } = useSessionUser();
   const [items, setItems] = useState<ApiItem[]>([]);
   const [settings, setSettings] = useState<ApiSettings | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -77,8 +77,8 @@ export default function ProfileScreen() {
     0
   );
 
-  const name = session?.user?.name || "You";
-  const email = session?.user?.email ?? "";
+  const name = user?.name || "You";
+  const email = user?.email ?? "";
 
   async function exportCsv() {
     setExporting(true);
@@ -199,7 +199,7 @@ export default function ProfileScreen() {
 
         {/* Identity */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-          <Avatar letter={name.charAt(0)} size={64} />
+          <Avatar letter={userInitial(user)} size={64} />
           <View style={{ gap: 3 }}>
             <Text
               style={{

@@ -55,3 +55,10 @@ export function addMonthsToDateString(dateStr: string, months: number) {
 }
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Avatar initial for a user; single home for the name→email→"?" fallback. */
+export function userInitial(
+  user: { name?: string | null; email?: string | null } | null | undefined
+) {
+  return (user?.name || user?.email || "?").charAt(0).toUpperCase();
+}

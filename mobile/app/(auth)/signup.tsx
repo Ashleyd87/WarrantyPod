@@ -7,9 +7,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link, Redirect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { authClient } from "@/lib/auth-client";
+import { authClient, useSessionUser } from "@/lib/auth-client";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
 import { Header } from "@/components/Header";
@@ -22,6 +22,10 @@ export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { user } = useSessionUser();
+
+  // Already signed in (e.g. a session finished rehydrating) — skip the form.
+  if (user) return <Redirect href="/(tabs)" />;
 
   async function submit() {
     if (!name || !email || !password) return;

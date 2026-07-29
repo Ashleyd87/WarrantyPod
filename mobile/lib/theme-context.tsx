@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { api } from "./api";
 import { THEMES, type AccentTokens, type ThemeName } from "./theme";
 
-const THEME_KEY = "warranty-vault.theme";
+export const THEME_KEY = "warranty-vault.theme";
 
 /** Coerce any stored value (incl. the retired "violet") to a valid theme. */
 function normalize(v: string | null | undefined): ThemeName | null {

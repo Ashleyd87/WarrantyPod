@@ -1,8 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import * as SecureStore from "expo-secure-store";
 import * as SplashScreen from "expo-splash-screen";
 import {
   useFonts,
@@ -17,7 +16,8 @@ import {
   JetBrainsMono_500Medium,
   JetBrainsMono_600SemiBold,
 } from "@expo-google-fonts/jetbrains-mono";
-import { fonts, ink } from "@/lib/theme";
+import { resetLocalAppData } from "@/lib/app-reset";
+import { ink } from "@/lib/theme";
 import { ThemeProvider } from "@/lib/theme-context";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -26,6 +26,11 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
  * Expo Router renders this instead of crashing the app when a screen throws.
  * Without it, a single bad render kills the process on every launch and the
  * app becomes unopenable — recoverable only by reinstalling.
+ *
+ * Deliberately self-sufficient: system fonts only (custom fonts may not be
+ * loaded when the error hits) and it hides the native splash screen itself —
+ * on a launch crash RootLayout's hide effect never commits, and without this
+ * the recovery UI would sit invisible behind the frozen splash.
  */
 export function ErrorBoundary({
   error,
@@ -34,6 +39,25 @@ export function ErrorBoundary({
   error: Error;
   retry: () => Promise<void>;
 }) {
+  const [resetting, setResetting] = useState(false);
+
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
+  async function resetAndRetry() {
+    if (resetting) return;
+    setResetting(true);
+    try {
+      // Signs out (server + in-memory session atom) and purges every
+      // SecureStore key the app writes, chunked auth values included.
+      await resetLocalAppData();
+    } finally {
+      setResetting(false);
+      await retry();
+    }
+  }
+
   return (
     <View
       style={{
@@ -45,24 +69,21 @@ export function ErrorBoundary({
         gap: 16,
       }}
     >
-      <Text
-        style={{ fontFamily: fonts.extrabold, fontSize: 22, color: ink.ink }}
-      >
+      <Text style={{ fontWeight: "800", fontSize: 22, color: ink.ink }}>
         Something went wrong
       </Text>
       <Text
         style={{
-          fontFamily: fonts.regular,
           fontSize: 14,
           lineHeight: 21,
           color: ink.textSecondary,
           textAlign: "center",
         }}
       >
-        {error?.message ?? "Unexpected error"}
+        {error.message || "Unexpected error"}
       </Text>
       <Pressable
-        onPress={() => retry()}
+        onPress={retry}
         style={({ pressed }) => ({
           height: 52,
           paddingHorizontal: 30,
@@ -73,38 +94,21 @@ export function ErrorBoundary({
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: "#FFFFFF" }}>
+        <Text style={{ fontWeight: "700", fontSize: 15, color: "#FFFFFF" }}>
           Try again
         </Text>
       </Pressable>
       {/* Escape hatch: a corrupt stored session can't wedge the app forever. */}
-      <Pressable
-        onPress={async () => {
-          // Keys written by @better-auth/expo (storagePrefix "warranty-vault")
-          // plus our own theme cache.
-          for (const key of [
-            "warranty-vault_cookie",
-            "warranty-vault_session_data",
-            "warranty-vault.oauth_state",
-            "warranty-vault.theme",
-          ]) {
-            try {
-              await SecureStore.deleteItemAsync(key);
-            } catch {}
-          }
-          retry();
-        }}
-        hitSlop={8}
-      >
+      <Pressable onPress={resetAndRetry} hitSlop={8} disabled={resetting}>
         <Text
           style={{
-            fontFamily: fonts.semibold,
+            fontWeight: "600",
             fontSize: 13.5,
             color: ink.textSecondary,
             textDecorationLine: "underline",
           }}
         >
-          Reset app data & sign out
+          {resetting ? "Resetting…" : "Reset app data & sign out"}
         </Text>
       </Pressable>
     </View>

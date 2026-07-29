@@ -13,12 +13,11 @@ import { Redirect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import { Feather } from "@expo/vector-icons";
-import { authClient } from "@/lib/auth-client";
+import { ONBOARDED_KEY } from "@/lib/app-reset";
+import { useSessionUser } from "@/lib/auth-client";
 import { fonts } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
 import { LoadingScreen } from "@/components/ui";
-
-const ONBOARDED_KEY = "warranty-vault.onboarded";
 
 const PAGES = [
   {
@@ -58,7 +57,7 @@ function hasOnboarded(): boolean {
 export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useTheme();
-  const { data: session, isPending } = authClient.useSession();
+  const { user, isPending } = useSessionUser();
   const [index, setIndex] = useState(0);
   // Read once per mount so tapping "back" mid-flow doesn't bounce to login.
   const [onboarded] = useState(hasOnboarded);
@@ -66,7 +65,7 @@ export default function OnboardingScreen() {
   const width = Dimensions.get("window").width;
 
   if (isPending) return <LoadingScreen />;
-  if (session?.user) return <Redirect href="/(tabs)" />;
+  if (user) return <Redirect href="/(tabs)" />;
   // Returning (signed-out) users skip straight to sign-in.
   if (onboarded) return <Redirect href="/login" />;
 

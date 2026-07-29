@@ -2,7 +2,8 @@ import React from "react";
 import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { authClient } from "@/lib/auth-client";
+import { useSessionUser } from "@/lib/auth-client";
+import { userInitial } from "@/lib/format";
 import { fonts, ink } from "@/lib/theme";
 import { Avatar, CircleBtn } from "./ui";
 
@@ -24,8 +25,8 @@ export function Header({
   center?: React.ReactNode;
 }) {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
-  const letter = (session?.user?.name || session?.user?.email || "?").charAt(0);
+  const { user } = useSessionUser();
+  const letter = userInitial(user);
 
   return (
     <View

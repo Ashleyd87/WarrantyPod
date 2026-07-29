@@ -7,9 +7,9 @@ import {
   Text,
   View,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link, Redirect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { authClient } from "@/lib/auth-client";
+import { authClient, useSessionUser } from "@/lib/auth-client";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
 import { Header } from "@/components/Header";
@@ -21,6 +21,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { user } = useSessionUser();
+
+  // A session that finishes rehydrating while the user sits here (e.g. after
+  // a partial-session redirect) forwards them without re-entering credentials.
+  if (user) return <Redirect href="/(tabs)" />;
 
   async function submit() {
     if (!email || !password) return;
