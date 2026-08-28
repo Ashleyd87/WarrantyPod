@@ -36,6 +36,7 @@ export interface ItemFormValues {
   warrantyDurationMonths: string;
   warrantyExpirationDate: string;
   warrantyAssumed: boolean;
+  barcode: string;
   notes: string;
 }
 
@@ -53,6 +54,7 @@ const EMPTY: ItemFormValues = {
   warrantyDurationMonths: "",
   warrantyExpirationDate: "",
   warrantyAssumed: false,
+  barcode: "",
   notes: "",
 };
 
@@ -71,6 +73,7 @@ export function itemToFormValues(item: ApiItem): ItemFormValues {
     warrantyDurationMonths: item.warrantyDurationMonths?.toString() ?? "",
     warrantyExpirationDate: toDateInputValue(item.warrantyExpirationDate),
     warrantyAssumed: item.warrantyAssumed,
+    barcode: item.barcode ?? "",
     notes: item.notes ?? "",
   };
 }
@@ -88,6 +91,7 @@ export function ItemForm({
   initialValues,
   initialPhotos = [],
   initialSerial = null,
+  initialBarcode = null,
   defaultCurrency = "USD",
   autoExtract = false,
   onSaved,
@@ -97,6 +101,7 @@ export function ItemForm({
   initialValues?: ItemFormValues;
   initialPhotos?: PendingPhoto[];
   initialSerial?: string | null;
+  initialBarcode?: string | null;
   defaultCurrency?: string;
   autoExtract?: boolean;
   onSaved: (item: ApiItem) => void;
@@ -107,6 +112,7 @@ export function ItemForm({
     currency: defaultCurrency,
     ...(initialValues ?? {}),
     ...(initialSerial ? { serialNumber: initialSerial } : {}),
+    ...(initialBarcode ? { barcode: initialBarcode } : {}),
   });
   const [photos, setPhotos] = useState<PendingPhoto[]>(initialPhotos);
   const [confidence, setConfidence] = useState<

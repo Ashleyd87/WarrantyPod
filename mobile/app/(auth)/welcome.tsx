@@ -23,7 +23,7 @@ const PAGES = [
     image: require("../../assets/laptop-ink.png"),
     imageHeight: 250,
     headline: "Log gear as\nyou buy it",
-    body: "Snap the receipt or forward the purchase email — details file themselves.",
+    body: "Snap the receipt or scan the barcode — the details file themselves.",
   },
   {
     image: require("../../assets/vault-user.png"),

@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -40,14 +41,20 @@ export default function ItemDetailScreen() {
   const insets = useSafeAreaInsets();
   const [item, setItem] = useState<ApiItem | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [webImage, setWebImage] = useState<string | null>(null);
+  const [findingImage, setFindingImage] = useState(false);
+  const [webImageFailed, setWebImageFailed] = useState(false);
+  const lookupRan = useRef(false);
 
   const load = useCallback(async () => {
     try {
       const data = await api<{ item: ApiItem }>(`/api/items/${id}`);
       setItem(data.item);
+      return data.item;
     } catch {
       Alert.alert("Not found", "This product no longer exists.");
       router.back();
+      return null;
     }
   }, [id, router]);
 
@@ -57,11 +64,41 @@ export default function ItemDetailScreen() {
     }, [load])
   );
 
+  /**
+   * No photo of their own? Look one up in the background, once per screen.
+   * Purely illustrative — a real photo the user takes always replaces it.
+   */
+  useEffect(() => {
+    if (!item || lookupRan.current) return;
+    const ownPhoto = item.assets.some(
+      (a) => a.type === "PRODUCT_PHOTO" && a.mimeType.startsWith("image/")
+    );
+    if (ownPhoto) return;
+    if (item.imageUrl) {
+      setWebImage(item.imageUrl);
+      return;
+    }
+    lookupRan.current = true;
+    setFindingImage(true);
+    api<{ imageUrl: string | null }>(`/api/items/${item.id}/product-image`, {
+      method: "POST",
+    })
+      .then((r) => setWebImage(r.imageUrl))
+      .catch(() => {})
+      .finally(() => setFindingImage(false));
+  }, [item]);
+
   if (!item) return <LoadingScreen />;
 
   const w = item.warranty;
-  const images = item.assets.filter((a) => a.mimeType.startsWith("image/"));
+  // The user's own product photo leads; receipts and stickers come after.
+  const images = item.assets
+    .filter((a) => a.mimeType.startsWith("image/"))
+    .sort((a, b) =>
+      a.type === "PRODUCT_PHOTO" ? -1 : b.type === "PRODUCT_PHOTO" ? 1 : 0
+    );
   const hero = images[Math.min(photoIndex, Math.max(0, images.length - 1))];
+  const showWebImage = !hero && Boolean(webImage) && !webImageFailed;
   const statusLabel =
     w.status === "EXPIRED"
       ? "Expired"
@@ -75,18 +112,58 @@ export default function ItemDetailScreen() {
     Alert.alert("Copied", "Serial number copied to clipboard.");
   }
 
-  async function addPhoto() {
-    const r = await ImagePicker.launchCameraAsync({ mediaTypes: "images", quality: 0.55 });
-    if (r.canceled || !r.assets?.[0]) return;
+  async function uploadPhoto(uri: string, assetType: string) {
     const fd = new FormData();
-    fd.append("assetFile", filePart(r.assets[0].uri, "photo.jpg"));
-    fd.append("assetType", "PRODUCT_PHOTO");
+    fd.append("assetFile", filePart(uri, "photo.jpg"));
+    fd.append("assetType", assetType);
     try {
       await api(`/api/items/${item!.id}/assets`, { method: "POST", body: fd });
+      // A real photo supersedes any stock image.
+      setWebImage(null);
+      setPhotoIndex(0);
       load();
     } catch (e) {
       Alert.alert("Upload failed", e instanceof Error ? e.message : "Try again.");
     }
+  }
+
+  async function addPhoto() {
+    const r = await ImagePicker.launchCameraAsync({ mediaTypes: "images", quality: 0.55 });
+    if (r.canceled || !r.assets?.[0]) return;
+    await uploadPhoto(r.assets[0].uri, "PRODUCT_PHOTO");
+  }
+
+  /** Camera or library, so the hero can be a photo they already have. */
+  function takeProductPhoto() {
+    Alert.alert("Photo of this item", "This becomes the picture on this page.", [
+      {
+        text: "Take photo",
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) return;
+          const r = await ImagePicker.launchCameraAsync({
+            mediaTypes: "images",
+            quality: 0.55,
+          });
+          if (!r.canceled && r.assets?.[0]) {
+            await uploadPhoto(r.assets[0].uri, "PRODUCT_PHOTO");
+          }
+        },
+      },
+      {
+        text: "Choose from library",
+        onPress: async () => {
+          const r = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: "images",
+            quality: 0.55,
+          });
+          if (!r.canceled && r.assets?.[0]) {
+            await uploadPhoto(r.assets[0].uri, "PRODUCT_PHOTO");
+          }
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
   }
 
   function moreActions() {
@@ -137,12 +214,69 @@ export default function ItemDetailScreen() {
                 resizeMode="cover"
               />
             </Pressable>
+          ) : showWebImage ? (
+            // Found on the web, not taken by the user — labelled as such, and
+            // it falls back to the placeholder if the remote URL ever dies.
+            <Pressable style={{ flex: 1 }} onPress={takeProductPhoto}>
+              <Image
+                source={{ uri: webImage! }}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
+                onError={() => setWebImageFailed(true)}
+              />
+              <View
+                style={{
+                  position: "absolute",
+                  left: SCREEN_PAD,
+                  bottom: 12,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: "rgba(255,255,255,0.92)",
+                  borderRadius: 999,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                }}
+              >
+                <Feather name="globe" size={11} color={ink.textSecondary} />
+                <Text
+                  style={{
+                    fontFamily: fonts.semibold,
+                    fontSize: 10.5,
+                    color: ink.textSecondary,
+                  }}
+                >
+                  Stock image · tap to use your own
+                </Text>
+              </View>
+            </Pressable>
           ) : (
-            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-              <Mono size={11} color={ink.placeholderText}>
-                [ product photo — {item.brand} ]
-              </Mono>
-            </View>
+            <Pressable
+              onPress={takeProductPhoto}
+              style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 10 }}
+            >
+              {findingImage ? (
+                <>
+                  <ActivityIndicator size="small" color={ink.placeholderText} />
+                  <Mono size={10} color={ink.placeholderText}>
+                    finding a product image…
+                  </Mono>
+                </>
+              ) : (
+                <>
+                  <Feather name="camera" size={22} color={ink.placeholderText} />
+                  <Text
+                    style={{
+                      fontFamily: fonts.semibold,
+                      fontSize: 12.5,
+                      color: ink.placeholderText,
+                    }}
+                  >
+                    Add a photo of your {item.brand}
+                  </Text>
+                </>
+              )}
+            </Pressable>
           )}
           <View
             style={{

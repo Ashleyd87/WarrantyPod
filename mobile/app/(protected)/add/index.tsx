@@ -150,7 +150,7 @@ export default function AddToVaultScreen() {
                 color: "#FFFFFF",
               }}
             >
-              Import order email
+              Upload order email
             </Text>
           </View>
           <Text
@@ -162,8 +162,9 @@ export default function AddToVaultScreen() {
               color: "rgba(255,255,255,0.7)",
             }}
           >
-            Upload an order confirmation — purchase date, price and store fill
-            in automatically.
+            Pick an order confirmation from your files — purchase date, price
+            and store fill in automatically. Your mailbox is never connected or
+            scanned.
           </Text>
           <View style={{ marginTop: 14, flexDirection: "row", gap: 8 }}>
             <OutlineChip label="PDF" onInk />

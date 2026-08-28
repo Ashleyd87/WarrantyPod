@@ -46,7 +46,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     target: "home-add",
     title: "Add in seconds",
-    body: "Snap the receipt and serial sticker, or import an order email — the details fill themselves in.",
+    body: "Photograph the product, scan its barcode or serial sticker, snap the receipt — or upload an order confirmation yourself.",
   },
   {
     target: "tab-items",

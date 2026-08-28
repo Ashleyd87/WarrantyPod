@@ -41,6 +41,11 @@ export interface ApiItem {
   warrantyDurationMonths: number | null;
   warrantyExpirationDate: string | null;
   warrantyAssumed: boolean;
+  barcode: string | null;
+  /** Illustrative web image; only used when the user has no product photo. */
+  imageUrl: string | null;
+  imageSource: string | null;
+  imageCheckedAt: string | null;
   notes: string | null;
   archived: boolean;
   createdAt: string;

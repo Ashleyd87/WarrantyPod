@@ -36,6 +36,7 @@ export const productItemSchema = z.object({
     z.coerce.date().nullable()
   ),
   warrantyAssumed: z.coerce.boolean().default(false),
+  barcode: z.preprocess(emptyToNull, z.string().trim().max(64).nullable()),
   notes: z.preprocess(emptyToNull, z.string().trim().max(5000).nullable()),
 });
 

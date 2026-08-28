@@ -37,6 +37,11 @@ export function serializeItem(item: ItemWithRelations, leadDays: number) {
     warrantyDurationMonths: item.warrantyDurationMonths,
     warrantyExpirationDate: item.warrantyExpirationDate?.toISOString() ?? null,
     warrantyAssumed: item.warrantyAssumed,
+    barcode: item.barcode,
+    // Illustrative web image, used only when the user has no product photo.
+    imageUrl: item.imageUrl,
+    imageSource: item.imageSource,
+    imageCheckedAt: item.imageCheckedAt?.toISOString() ?? null,
     notes: item.notes,
     archived: item.archived,
     createdAt: item.createdAt.toISOString(),

@@ -137,6 +137,19 @@ model ProductItem {
   // True when the warranty length was assumed (not read from a document).
   warrantyAssumed        Boolean   @default(false)
 
+  // Product barcode (UPC/EAN/Code128) captured by the scanner, when present.
+  barcode                String?
+
+  // Illustrative product photo shown on the item page when the user hasn't
+  // taken one themselves. USER means a real uploaded asset is preferred;
+  // WEB means imageUrl was found by a background web lookup (hotlinked, so
+  // it may go stale — always fall back to the placeholder on load error).
+  imageUrl               String?
+  // USER | WEB | NONE (NONE = looked and found nothing)
+  imageSource            String?
+  // When the web lookup last ran, so a miss isn't retried on every open.
+  imageCheckedAt         DateTime?
+
   notes                  String?
   archived               Boolean   @default(false)
   createdAt              DateTime  @default(now())

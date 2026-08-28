@@ -18,6 +18,7 @@ export const ITEM_FIELDS = [
   "warrantyDurationMonths",
   "warrantyExpirationDate",
   "warrantyAssumed",
+  "barcode",
   "notes",
 ] as const;
 

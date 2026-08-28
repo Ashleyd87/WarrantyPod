@@ -30,9 +30,9 @@ Per stakeholder direction, the product is a **native mobile app** (Expo / React 
 4. Act as the household's serial-number registry (insurance / theft documentation via CSV export).
 
 ### Non-Goals (v1 — documented for v2)
-- Email receipt auto-import (Gmail/Outlook scanning) — strongest differentiator in competitor reviews, but complex; v2.
+- Mailbox integration / automatic email scanning (Gmail/Outlook) — deliberately dropped, not deferred. Connecting a user's mailbox means broad inbox access for a marginal gain over a file picker, so the product does not ask for it. Users upload order confirmations themselves (PDF, .eml or a screenshot) and the same extraction runs on them.
 - Household / family sharing and multi-user vaults — v2.
-- Client-side barcode scanning (ZXing) for serials — v2.
+- (Shipped) Client-side barcode/QR scanning for serial and product codes.
 - Push/email notifications — v1 ships in-app notifications only.
 - Native app store distribution — v2 via PWA wrapper.
 
@@ -189,9 +189,7 @@ Notes: prices are `Decimal`, never float. `warrantyExpirationDate` is stored (co
 
 ## 9. v2 Roadmap
 
-1. Email receipt auto-import (forwarding address and/or mailbox integration).
 2. Email + push notifications (needs scheduled jobs / native wrapper).
 3. Household sharing (vault members, roles).
-4. Barcode/QR scanning for instant serial capture.
 5. Warranty-length knowledge base by brand/category (auto-suggest beyond the receipt).
 6. Native wrapper via Expo/Capacitor for store distribution.

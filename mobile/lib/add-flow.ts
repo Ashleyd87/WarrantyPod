@@ -9,6 +9,7 @@ export interface PendingPhoto {
 
 let photos: PendingPhoto[] = [];
 let serial: string | null = null;
+let barcode: string | null = null;
 
 export const addFlow = {
   addPhoto(p: PendingPhoto) {
@@ -17,10 +18,18 @@ export const addFlow = {
   setSerial(s: string) {
     serial = s;
   },
-  takeAll(): { photos: PendingPhoto[]; serial: string | null } {
-    const out = { photos, serial };
+  setBarcode(b: string) {
+    barcode = b;
+  },
+  takeAll(): {
+    photos: PendingPhoto[];
+    serial: string | null;
+    barcode: string | null;
+  } {
+    const out = { photos, serial, barcode };
     photos = [];
     serial = null;
+    barcode = null;
     return out;
   },
   peekCount(): number {
@@ -29,5 +38,6 @@ export const addFlow = {
   clear() {
     photos = [];
     serial = null;
+    barcode = null;
   },
 };

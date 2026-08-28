@@ -5,6 +5,7 @@ import {
   Easing,
   Image,
   Pressable,
+  ScrollView,
   Text,
   View,
 } from "react-native";
@@ -18,17 +19,22 @@ import { fonts, ink } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
 import { Mono, Overline, Pill } from "@/components/ui";
 
-type Mode = "appliance" | "serial" | "receipt";
+type Mode = "product" | "serial" | "barcode" | "receipt";
 
 const MODE_META: Record<Mode, { label: string; caption: string; assetType: string }> = {
-  appliance: {
-    label: "Appliance",
-    caption: "Photograph the whole product",
+  product: {
+    label: "Product",
+    caption: "Photograph the product — this becomes its picture",
     assetType: "PRODUCT_PHOTO",
   },
   serial: {
     label: "Serial",
     caption: "Align the serial sticker inside the frame",
+    assetType: "SERIAL_STICKER",
+  },
+  barcode: {
+    label: "Barcode",
+    caption: "Point at the barcode — it reads automatically",
     assetType: "SERIAL_STICKER",
   },
   receipt: {
@@ -37,6 +43,21 @@ const MODE_META: Record<Mode, { label: string; caption: string; assetType: strin
     assetType: "RECEIPT",
   },
 };
+
+/** 1-D product/serial symbologies plus QR, which some makers now use. */
+const BARCODE_TYPES = [
+  "ean13",
+  "ean8",
+  "upc_a",
+  "upc_e",
+  "code39",
+  "code93",
+  "code128",
+  "itf14",
+  "codabar",
+  "qr",
+  "datamatrix",
+] as const;
 
 export default function CameraScreen() {
   const router = useRouter();
@@ -48,8 +69,14 @@ export default function CameraScreen() {
   const [torch, setTorch] = useState(false);
   const [busy, setBusy] = useState(false);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
-  const [detected, setDetected] = useState<{ serial: string; confidence: string } | null>(null);
+  const [detected, setDetected] = useState<{
+    value: string;
+    confidence: string;
+    kind: "serial" | "barcode";
+  } | null>(null);
   const [count, setCount] = useState(addFlow.peekCount());
+  // Guards against the scanner firing dozens of times per second on one label.
+  const lastScan = useRef<string>("");
 
   const scanY = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -99,8 +126,9 @@ export default function CameraScreen() {
           );
           if (result.serialNumber) {
             setDetected({
-              serial: result.serialNumber,
+              value: result.serialNumber,
               confidence: result.confidence?.serialNumber ?? "medium",
+              kind: "serial",
             });
           }
         } catch {
@@ -110,6 +138,29 @@ export default function CameraScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Live barcode reads — no shutter press needed in barcode mode. */
+  function onBarcode({ data }: { data: string }) {
+    const value = data?.trim();
+    if (!value || value === lastScan.current) return;
+    lastScan.current = value;
+    setDetected({ value, confidence: "high", kind: "barcode" });
+  }
+
+  function acceptDetected() {
+    if (!detected) return;
+    if (detected.kind === "barcode") {
+      addFlow.setBarcode(detected.value);
+      // A UPC/EAN identifies the product, not the unit, so it must not be
+      // filed as a serial number. Longer codes are usually the serial.
+      if (!/^\d{8}$|^\d{12,14}$/.test(detected.value)) {
+        addFlow.setSerial(detected.value);
+      }
+    } else {
+      addFlow.setSerial(detected.value);
+    }
+    router.replace("/add/form");
   }
 
   function close() {
@@ -159,6 +210,8 @@ export default function CameraScreen() {
         style={{ flex: 1 }}
         facing={facing}
         enableTorch={torch}
+        barcodeScannerSettings={{ barcodeTypes: [...BARCODE_TYPES] }}
+        onBarcodeScanned={mode === "barcode" ? onBarcode : undefined}
       />
 
       {/* Overlay */}
@@ -234,7 +287,7 @@ export default function CameraScreen() {
                 }}
               />
             ))}
-            {mode === "serial" && (
+            {(mode === "serial" || mode === "barcode") && (
               <Animated.View
                 style={{
                   position: "absolute",
@@ -284,9 +337,11 @@ export default function CameraScreen() {
               }}
             >
               <View style={{ flex: 1, gap: 5 }}>
-                <Overline>Serial detected</Overline>
+                <Overline>
+                  {detected.kind === "barcode" ? "Barcode read" : "Serial detected"}
+                </Overline>
                 <Mono size={16} weight="medium">
-                  {detected.serial}
+                  {detected.value}
                 </Mono>
               </View>
               <View
@@ -298,14 +353,15 @@ export default function CameraScreen() {
                 }}
               >
                 <Text style={{ fontFamily: fonts.bold, fontSize: 12.5, color: t.onAccent }}>
-                  {detected.confidence === "high" ? "98% match" : "likely match"}
+                  {detected.kind === "barcode"
+                    ? "scanned"
+                    : detected.confidence === "high"
+                      ? "98% match"
+                      : "likely match"}
                 </Text>
               </View>
               <Pressable
-                onPress={() => {
-                  addFlow.setSerial(detected.serial);
-                  router.replace("/add/form");
-                }}
+                onPress={acceptDetected}
                 style={({ pressed }) => ({
                   backgroundColor: ink.ink,
                   borderRadius: 999,
@@ -324,7 +380,17 @@ export default function CameraScreen() {
           )}
 
           {/* Mode chips */}
-          <View style={{ flexDirection: "row", justifyContent: "center", gap: 10 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: 10,
+              paddingHorizontal: 4,
+              flexGrow: 1,
+            }}
+          >
             {(Object.keys(MODE_META) as Mode[]).map((m) => {
               const active = m === mode;
               return (
@@ -333,11 +399,12 @@ export default function CameraScreen() {
                   onPress={() => {
                     setMode(m);
                     setDetected(null);
+                    lastScan.current = "";
                   }}
                   style={{
                     backgroundColor: active ? t.cameraAccent : ink.overlayPill,
                     borderRadius: 999,
-                    paddingHorizontal: 18,
+                    paddingHorizontal: 16,
                     paddingVertical: 11,
                   }}
                 >
@@ -353,7 +420,7 @@ export default function CameraScreen() {
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           {/* Shutter row */}
           <View

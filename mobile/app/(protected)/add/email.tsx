@@ -178,7 +178,7 @@ export default function EmailImportScreen() {
             alignItems: "baseline",
           }}
         >
-          <SectionLabel>Order confirmations found</SectionLabel>
+          <SectionLabel>Files you selected</SectionLabel>
           <View style={{ flex: 1 }} />
           <Text
             style={{
