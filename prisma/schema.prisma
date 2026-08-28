@@ -126,6 +126,19 @@ model BarcodeProduct {
   updatedAt      DateTime @updatedAt
 }
 
+// Shared cache of product images found on the web, keyed by brand+model.
+// Global, not per-user: the same product resolves to the same picture.
+model ProductImage {
+  key       String   @id
+  brand     String
+  modelName String
+  imageUrl  String?
+  // WEB | NONE
+  source    String   @default("NONE")
+  checkedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model ProductItem {
   id                     String    @id @default(cuid())
   userId                 String

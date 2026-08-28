@@ -14,7 +14,7 @@ import {
 } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { api, type ApiItem } from "@/lib/api";
+import { vault, type VaultItemView } from "@/lib/vault";
 import { CATEGORIES, CATEGORY_LABELS } from "@/lib/constants";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
 import { Header } from "@/components/Header";
@@ -44,7 +44,7 @@ export default function ItemsScreen() {
     filter?: string;
     focus?: string;
   }>();
-  const [items, setItems] = useState<ApiItem[]>([]);
+  const [items, setItems] = useState<VaultItemView[]>([]);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const searchRef = useRef<TextInput>(null);
@@ -60,8 +60,7 @@ export default function ItemsScreen() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ items: ApiItem[] }>("/api/items");
-      setItems(data.items);
+      setItems(await vault.listItems());
     } catch {
       // keep last data
     }

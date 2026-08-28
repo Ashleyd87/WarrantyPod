@@ -1,65 +1,43 @@
 import * as SecureStore from "expo-secure-store";
-import { AUTH_STORAGE_PREFIX, authClient } from "./auth-client";
+import { Directory, File, Paths } from "expo-file-system";
+import { vault } from "./vault";
 import { THEME_KEY } from "./theme-context";
+import { TOUR_KEY } from "./tour-context";
 
 /** Onboarding-complete flag written by the welcome screen. */
 export const ONBOARDED_KEY = "warranty-vault.onboarded";
 
-// @better-auth/expo splits SecureStore values over 1800 chars across
-// `${key}.0..N` sub-keys, leaving `ba-chunks:N` in the base key. Deleting
-// only the base key would strand auth material in the device keychain.
-const CHUNK_MARKER = "ba-chunks:";
-const CHUNK_SWEEP_MIN = 10;
-
-async function del(key: string) {
-  try {
-    await SecureStore.deleteItemAsync(key);
-  } catch {
-    // Missing keys and keychain hiccups are fine — this is best-effort cleanup.
-  }
-}
-
-async function chunkCount(base: string): Promise<number> {
-  try {
-    const stored = await SecureStore.getItemAsync(base);
-    if (stored?.startsWith(CHUNK_MARKER)) {
-      const n = Number(stored.slice(CHUNK_MARKER.length));
-      if (Number.isInteger(n) && n > 0) return n;
+/**
+ * Clears preferences only — the vault's records and photos are left alone.
+ * Used by the root ErrorBoundary so a bad stored preference can't wedge the
+ * app while still never destroying the user's irreplaceable data.
+ */
+export async function resetPreferences(): Promise<void> {
+  for (const key of [THEME_KEY, TOUR_KEY, ONBOARDED_KEY]) {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      // A missing key is already the desired end state.
     }
-  } catch {}
-  return 0;
+  }
+  vault.invalidate();
 }
 
 /**
- * Full local reset: revoke + clear the session the supported way, then purge
- * every SecureStore key the app (or better-auth) writes, chunks included.
- * Used by the root ErrorBoundary's escape hatch.
+ * Destroys everything on this device: every record and every photo. There is
+ * no server copy, so this is unrecoverable without a backup export — callers
+ * must confirm explicitly.
  */
-export async function resetLocalAppData(): Promise<void> {
-  const bases = [
-    `${AUTH_STORAGE_PREFIX}_cookie`,
-    `${AUTH_STORAGE_PREFIX}_session_data`,
-  ];
-
-  // Read chunk counts BEFORE sign-out — clearSessionCache overwrites the
-  // base keys (erasing the ba-chunks markers) without removing the chunks.
-  const counts = await Promise.all(bases.map(chunkCount));
-
-  // Canonical sign-out: revokes the server session and clears better-auth's
-  // in-memory session atom + storage cache. The plugin clears local state in
-  // its request hook, so this works even when the network call fails.
+export async function eraseVault(): Promise<void> {
   try {
-    await authClient.signOut();
+    const photos = new Directory(Paths.document, "photos");
+    if (photos.exists) photos.delete();
+  } catch {
+    // Fall through — the records still get cleared below.
+  }
+  try {
+    const doc = new File(Paths.document, "vault.json");
+    if (doc.exists) doc.delete();
   } catch {}
-
-  const deletes: Promise<void>[] = [];
-  bases.forEach((base, i) => {
-    deletes.push(del(base));
-    // Sweep at least CHUNK_SWEEP_MIN sub-keys to catch stale chunks whose
-    // marker was already overwritten by an earlier small write.
-    const n = Math.max(counts[i], CHUNK_SWEEP_MIN);
-    for (let c = 0; c < n; c++) deletes.push(del(`${base}.${c}`));
-  });
-  deletes.push(del(THEME_KEY), del(ONBOARDED_KEY));
-  await Promise.all(deletes);
+  vault.invalidate();
 }

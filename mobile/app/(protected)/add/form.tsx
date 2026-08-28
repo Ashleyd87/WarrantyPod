@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { api, type ApiSettings } from "@/lib/api";
+import { vault } from "@/lib/vault";
 import { addFlow, type PendingPhoto } from "@/lib/add-flow";
 import { ink, SCREEN_PAD } from "@/lib/theme";
 import { Header } from "@/components/Header";
@@ -17,8 +17,9 @@ export default function AddFormScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      api<{ settings: ApiSettings }>("/api/settings")
-        .then((d) => setCurrency(d.settings.currency))
+      vault
+        .settings()
+        .then((s) => setCurrency(s.currency))
         .catch(() => {});
     }, [])
   );

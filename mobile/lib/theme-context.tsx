@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { api } from "./api";
+import { vault } from "./vault";
 import { THEMES, type AccentTokens, type ThemeName } from "./theme";
 
 export const THEME_KEY = "warranty-vault.theme";
@@ -17,7 +17,7 @@ interface ThemeContextValue {
   t: AccentTokens;
   /** Instant local switch + persist (SecureStore + server settings). */
   setTheme: (name: ThemeName) => void;
-  /** Adopt the server-stored preference without re-persisting. */
+  /** Adopt the vault-stored preference without re-persisting. */
   syncFromServer: (name: string | undefined) => void;
 }
 
@@ -43,11 +43,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // non-fatal
     }
-    // Persist per account; fire-and-forget.
-    api("/api/settings", {
-      method: "PATCH",
-      body: JSON.stringify({ theme: name }),
-    }).catch(() => {});
+    // Persist into the on-device vault document; fire-and-forget.
+    vault.saveSettings({ theme: name }).catch(() => {});
   }, []);
 
   const syncFromServer = useCallback((name: string | undefined) => {

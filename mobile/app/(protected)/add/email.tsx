@@ -11,7 +11,9 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import { api, filePart, type ApiItem, type ExtractionResult } from "@/lib/api";
+import { api, filePart, type ExtractionResult } from "@/lib/api";
+import { vault } from "@/lib/vault";
+import { computeExpirationDate } from "@/lib/warranty";
 import { formatDate, formatMoney } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
 import { Header } from "@/components/Header";
@@ -126,33 +128,34 @@ export default function EmailImportScreen() {
       for (const row of selectedRows) {
         const x = row.extraction;
         const base = row.fileName.replace(/\.[a-z0-9]+$/i, "");
-        const fd = new FormData();
-        fd.append("brand", x?.brand ?? x?.storeName ?? "Unknown");
-        fd.append("modelName", x?.modelName ?? base);
-        fd.append("category", x?.suggestedCategory ?? "OTHER");
-        fd.append("serialNumber", x?.serialNumber ?? "");
-        fd.append("purchaseDate", x?.purchaseDate ?? "");
-        fd.append(
-          "purchasePrice",
-          x?.purchasePrice != null ? String(x.purchasePrice) : ""
-        );
-        fd.append("currency", x?.currency ?? "USD");
-        fd.append("storeName", x?.storeName ?? "");
-        fd.append("warrantyType", "MANUFACTURER");
-        fd.append(
-          "warrantyDurationMonths",
-          x?.estimatedWarrantyMonths != null
-            ? String(x.estimatedWarrantyMonths)
-            : ""
-        );
-        fd.append("warrantyAssumed", x?.warrantyAssumed === false ? "" : "true");
-        fd.append("notes", "");
-        // Attach the source file as the receipt (images + PDFs; .eml is text-only).
+        const months = x?.estimatedWarrantyMonths ?? null;
+        const purchaseDate = x?.purchaseDate
+          ? new Date(`${x.purchaseDate}T00:00:00Z`).toISOString()
+          : null;
+        const item = await vault.createItem({
+          brand: x?.brand ?? x?.storeName ?? "Unknown",
+          modelName: x?.modelName ?? base,
+          category: x?.suggestedCategory ?? "OTHER",
+          serialNumber: x?.serialNumber ?? null,
+          barcode: null,
+          purchaseDate,
+          purchasePrice: x?.purchasePrice != null ? String(x.purchasePrice) : null,
+          currency: x?.currency ?? "USD",
+          storeName: x?.storeName ?? null,
+          warrantyType: "MANUFACTURER",
+          warrantyProvider: null,
+          warrantyDurationMonths: months,
+          warrantyExpirationDate: computeExpirationDate(purchaseDate, months),
+          warrantyAssumed: x?.warrantyAssumed !== false,
+          imageUrl: null,
+          imageSource: null,
+          imageCheckedAt: null,
+          notes: null,
+        });
+        // Keep the source file as the receipt (images + PDFs; .eml is text-only).
         if (isImage(row.mimeType) || row.mimeType === "application/pdf") {
-          fd.append("assetFile", filePart(row.uri, row.fileName, row.mimeType));
-          fd.append("assetType", "RECEIPT");
+          await vault.addAsset(item.id, row.uri, "RECEIPT", row.mimeType);
         }
-        await api<{ item: ApiItem }>("/api/items", { method: "POST", body: fd });
         created += 1;
       }
       router.replace("/(tabs)/items");

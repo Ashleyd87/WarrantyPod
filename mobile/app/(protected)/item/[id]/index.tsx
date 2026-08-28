@@ -13,13 +13,8 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
-import {
-  api,
-  authHeaders,
-  fileUrl,
-  filePart,
-  type ApiItem,
-} from "@/lib/api";
+import { api } from "@/lib/api";
+import { assetUri, vault, type VaultItemView } from "@/lib/vault";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { formatDate, formatMoney } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
@@ -39,7 +34,7 @@ export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [item, setItem] = useState<ApiItem | null>(null);
+  const [item, setItem] = useState<VaultItemView | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [webImage, setWebImage] = useState<string | null>(null);
   const [findingImage, setFindingImage] = useState(false);
@@ -48,9 +43,10 @@ export default function ItemDetailScreen() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ item: ApiItem }>(`/api/items/${id}`);
-      setItem(data.item);
-      return data.item;
+      const found = await vault.getItem(id);
+      if (!found) throw new Error("gone");
+      setItem(found);
+      return found;
     } catch {
       Alert.alert("Not found", "This product no longer exists.");
       router.back();
@@ -80,10 +76,28 @@ export default function ItemDetailScreen() {
     }
     lookupRan.current = true;
     setFindingImage(true);
-    api<{ imageUrl: string | null }>(`/api/items/${item.id}/product-image`, {
+    api<{ imageUrl: string | null }>("/api/product-image", {
       method: "POST",
+      body: JSON.stringify({
+        brand: item.brand,
+        modelName: item.modelName,
+        category: item.category,
+        barcode: item.barcode,
+      }),
     })
-      .then((r) => setWebImage(r.imageUrl))
+      .then((r) => {
+        setWebImage(r.imageUrl);
+        // Remember it so reopening the item doesn't hit the network again.
+        if (r.imageUrl) {
+          vault
+            .updateItem(item.id, {
+              imageUrl: r.imageUrl,
+              imageSource: "WEB",
+              imageCheckedAt: new Date().toISOString(),
+            })
+            .catch(() => {});
+        }
+      })
       .catch(() => {})
       .finally(() => setFindingImage(false));
   }, [item]);
@@ -113,17 +127,14 @@ export default function ItemDetailScreen() {
   }
 
   async function uploadPhoto(uri: string, assetType: string) {
-    const fd = new FormData();
-    fd.append("assetFile", filePart(uri, "photo.jpg"));
-    fd.append("assetType", assetType);
     try {
-      await api(`/api/items/${item!.id}/assets`, { method: "POST", body: fd });
+      await vault.addAsset(item!.id, uri, assetType);
       // A real photo supersedes any stock image.
       setWebImage(null);
       setPhotoIndex(0);
       load();
     } catch (e) {
-      Alert.alert("Upload failed", e instanceof Error ? e.message : "Try again.");
+      Alert.alert("Saving failed", e instanceof Error ? e.message : "Try again.");
     }
   }
 
@@ -172,7 +183,7 @@ export default function ItemDetailScreen() {
       {
         text: item!.archived ? "Restore from archive" : "Archive",
         onPress: async () => {
-          await api(`/api/items/${item!.id}/archive`, { method: "POST" });
+          await vault.toggleArchive(item!.id);
           load();
         },
       },
@@ -186,7 +197,7 @@ export default function ItemDetailScreen() {
               text: "Delete",
               style: "destructive",
               onPress: async () => {
-                await api(`/api/items/${item!.id}`, { method: "DELETE" });
+                await vault.deleteItem(item!.id);
                 router.back();
               },
             },
@@ -209,7 +220,7 @@ export default function ItemDetailScreen() {
               }
             >
               <Image
-                source={{ uri: fileUrl(hero.id), headers: authHeaders() }}
+                source={{ uri: assetUri(hero) }}
                 style={{ width: "100%", height: "100%" }}
                 resizeMode="cover"
               />
@@ -442,7 +453,7 @@ export default function ItemDetailScreen() {
                         text: "Remove",
                         style: "destructive",
                         onPress: async () => {
-                          await api(`/api/assets/${a.id}`, { method: "DELETE" });
+                          await vault.removeAsset(item!.id, a.id);
                           load();
                         },
                       },
@@ -452,7 +463,7 @@ export default function ItemDetailScreen() {
                 >
                   {a.mimeType.startsWith("image/") ? (
                     <Image
-                      source={{ uri: fileUrl(a.id), headers: authHeaders() }}
+                      source={{ uri: assetUri(a) }}
                       style={{
                         width: 98,
                         height: 72,

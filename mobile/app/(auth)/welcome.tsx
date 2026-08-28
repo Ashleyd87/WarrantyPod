@@ -13,10 +13,8 @@ import { Redirect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import { ONBOARDED_KEY } from "@/lib/app-reset";
-import { useSessionUser } from "@/lib/auth-client";
 import { fonts } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
-import { LoadingScreen } from "@/components/ui";
 
 const PAGES = [
   {
@@ -56,17 +54,14 @@ function hasOnboarded(): boolean {
 export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useTheme();
-  const { user, isPending } = useSessionUser();
   const [index, setIndex] = useState(0);
-  // Read once per mount so tapping "back" mid-flow doesn't bounce to login.
+  // Read once per mount so swiping back mid-flow does not skip the pages.
   const [onboarded] = useState(hasOnboarded);
   const scrollRef = useRef<ScrollView>(null);
   const width = Dimensions.get("window").width;
 
-  if (isPending) return <LoadingScreen />;
-  if (user) return <Redirect href="/(tabs)" />;
-  // Returning (signed-out) users skip straight to sign-in.
-  if (onboarded) return <Redirect href="/login" />;
+  // Seen it already — straight into the vault.
+  if (onboarded) return <Redirect href="/(tabs)" />;
 
   function goTo(i: number) {
     scrollRef.current?.scrollTo({ x: i * width, animated: true });
@@ -82,14 +77,13 @@ export default function OnboardingScreen() {
     if (index < PAGES.length - 1) {
       goTo(index + 1);
     } else {
-      markOnboarded();
-      router.push("/signup");
+      enterVault();
     }
   }
 
-  function leave() {
+  function enterVault() {
     markOnboarded();
-    router.push("/login");
+    router.replace("/(tabs)");
   }
 
   const last = index === PAGES.length - 1;
@@ -198,7 +192,7 @@ export default function OnboardingScreen() {
               {last ? "Get started" : "Next"}
             </Text>
           </Pressable>
-          <Pressable onPress={leave} hitSlop={10} style={{ marginTop: 14 }}>
+          <Pressable onPress={enterVault} hitSlop={10} style={{ marginTop: 14 }}>
             <Text
               style={{
                 fontFamily: fonts.semibold,

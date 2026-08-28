@@ -16,7 +16,7 @@ import {
   JetBrainsMono_500Medium,
   JetBrainsMono_600SemiBold,
 } from "@expo-google-fonts/jetbrains-mono";
-import { resetLocalAppData } from "@/lib/app-reset";
+import { resetPreferences } from "@/lib/app-reset";
 import { ink } from "@/lib/theme";
 import { ThemeProvider } from "@/lib/theme-context";
 import { TourProvider } from "@/lib/tour-context";
@@ -51,9 +51,9 @@ export function ErrorBoundary({
     if (resetting) return;
     setResetting(true);
     try {
-      // Signs out (server + in-memory session atom) and purges every
-      // SecureStore key the app writes, chunked auth values included.
-      await resetLocalAppData();
+      // Clears stored preferences only — never the vault's records or
+      // photos, which exist nowhere else.
+      await resetPreferences();
     } finally {
       setResetting(false);
       await retry();
@@ -110,7 +110,7 @@ export function ErrorBoundary({
             textDecorationLine: "underline",
           }}
         >
-          {resetting ? "Resetting…" : "Reset app data & sign out"}
+          {resetting ? "Resetting…" : "Reset app preferences"}
         </Text>
       </Pressable>
     </View>

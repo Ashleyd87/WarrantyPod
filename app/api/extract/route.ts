@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { getDeviceId, missingDevice } from "@/lib/device-auth";
 import { extractFromInputs, isMockMode } from "@/lib/extraction";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateImageFile } from "@/lib/storage";
@@ -12,13 +11,11 @@ const EXTRACT_LIMIT = 10; // calls
 const EXTRACT_WINDOW_MS = 60_000; // per minute per user
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const deviceId = getDeviceId(request);
+  if (!deviceId) return missingDevice();
 
   const limit = checkRateLimit(
-    `extract:${session.user.id}`,
+    `extract:${deviceId}`,
     EXTRACT_LIMIT,
     EXTRACT_WINDOW_MS
   );

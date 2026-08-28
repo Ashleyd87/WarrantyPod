@@ -9,8 +9,9 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { api, type ApiItem } from "@/lib/api";
-import { useSessionUser } from "@/lib/auth-client";
+import { vault, type VaultItemView } from "@/lib/vault";
+import { loadSampleProducts } from "@/lib/sample-data";
+import { useOwner } from "@/lib/use-owner";
 import { formatDate, userInitial } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
 import { useTour, useTourTarget } from "@/lib/tour-context";
@@ -46,8 +47,8 @@ const CATEGORY_CARDS = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useSessionUser();
-  const [items, setItems] = useState<ApiItem[]>([]);
+  const owner = useOwner();
+  const [items, setItems] = useState<VaultItemView[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const { start: startTour, seen: tourSeen, active: tourActive } = useTour();
@@ -65,8 +66,8 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ items: ApiItem[] }>("/api/items");
-      setItems(data.items.filter((i) => !i.archived));
+      const all = await vault.listItems();
+      setItems(all.filter((i) => !i.archived));
     } catch {
       // keep last data
     }
@@ -75,7 +76,7 @@ export default function HomeScreen() {
   async function loadSamples() {
     setSeeding(true);
     try {
-      await api("/api/seed", { method: "POST" });
+      await loadSampleProducts();
       await load();
     } catch {
       // ignore
@@ -103,7 +104,7 @@ export default function HomeScreen() {
           (a, b) =>
             (a.warranty.daysRemaining ?? 9e9) - (b.warranty.daysRemaining ?? 9e9)
         );
-  const letter = userInitial(user);
+  const letter = userInitial(owner);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: ink.paper }} edges={["top"]}>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { api, type ApiItem } from "@/lib/api";
+import { vault, type VaultItemView } from "@/lib/vault";
 import { ink, SCREEN_PAD } from "@/lib/theme";
 import { Header } from "@/components/Header";
 import { ItemForm, itemToFormValues } from "@/components/ItemForm";
@@ -11,11 +11,12 @@ import { Headline, LoadingScreen } from "@/components/ui";
 export default function EditItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [item, setItem] = useState<ApiItem | null>(null);
+  const [item, setItem] = useState<VaultItemView | null>(null);
 
   useEffect(() => {
-    api<{ item: ApiItem }>(`/api/items/${id}`)
-      .then((d) => setItem(d.item))
+    vault
+      .getItem(id)
+      .then((found) => (found ? setItem(found) : router.back()))
       .catch(() => router.back());
   }, [id, router]);
 

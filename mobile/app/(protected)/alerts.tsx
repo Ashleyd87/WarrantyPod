@@ -3,7 +3,8 @@ import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { api, type ApiNotification, type ApiSettings } from "@/lib/api";
+import { listAlerts, markAlertsRead, type VaultAlert } from "@/lib/alerts";
+import { vault } from "@/lib/vault";
 import { REMINDER_LEAD_OPTIONS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
@@ -28,7 +29,7 @@ const ICONS: Record<string, { name: string; color: (accent: string) => string }>
 export default function AlertsScreen() {
   const router = useRouter();
   const { t } = useTheme();
-  const [notifications, setNotifications] = useState<ApiNotification[]>([]);
+  const [notifications, setNotifications] = useState<VaultAlert[]>([]);
   const [unread, setUnread] = useState(0);
   const [leadDays, setLeadDays] = useState(30);
   const [currency, setCurrency] = useState("USD");
@@ -36,16 +37,11 @@ export default function AlertsScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [n, s] = await Promise.all([
-        api<{ notifications: ApiNotification[]; unreadCount: number }>(
-          "/api/notifications"
-        ),
-        api<{ settings: ApiSettings }>("/api/settings"),
-      ]);
-      setNotifications(n.notifications);
-      setUnread(n.unreadCount);
-      setLeadDays(s.settings.reminderLeadDays);
-      setCurrency(s.settings.currency);
+      const [alerts, s] = await Promise.all([listAlerts(), vault.settings()]);
+      setNotifications(alerts);
+      setUnread(alerts.filter((a) => !a.read).length);
+      setLeadDays(s.reminderLeadDays);
+      setCurrency(s.currency);
     } catch {
       // keep last data
     }
@@ -57,23 +53,15 @@ export default function AlertsScreen() {
     }, [load])
   );
 
-  async function open(n: ApiNotification) {
-    if (!n.read) {
-      api("/api/notifications", {
-        method: "POST",
-        body: JSON.stringify({ id: n.id }),
-      }).catch(() => {});
-    }
-    router.push(`/item/${n.productItemId}`);
+  async function open(n: VaultAlert) {
+    if (!n.read) markAlertsRead([n.id]).catch(() => {});
+    router.push(`/item/${n.itemId}`);
   }
 
   async function saveSettings() {
     setSaving(true);
     try {
-      await api("/api/settings", {
-        method: "PATCH",
-        body: JSON.stringify({ reminderLeadDays: leadDays, currency }),
-      });
+      await vault.saveSettings({ reminderLeadDays: leadDays, currency });
       Alert.alert("Saved", "Alert preferences updated.");
       load();
     } catch (e) {
@@ -106,10 +94,7 @@ export default function AlertsScreen() {
             icon={<Feather name="check-circle" size={17} color={ink.ink} />}
             style={{ borderWidth: 1.5, borderColor: ink.controlBorder }}
             onPress={async () => {
-              await api("/api/notifications", {
-                method: "POST",
-                body: JSON.stringify({ all: true }),
-              }).catch(() => {});
+              await markAlertsRead(notifications.map((n) => n.id)).catch(() => {});
               load();
             }}
           />
@@ -182,7 +167,11 @@ export default function AlertsScreen() {
                     <Text
                       style={{ fontFamily: fonts.regular, fontSize: 11, color: ink.textMuted }}
                     >
-                      {formatDate(n.createdAt)}
+                      {n.daysRemaining >= 0
+                        ? `${n.daysRemaining} day${n.daysRemaining === 1 ? "" : "s"} left`
+                        : `expired ${Math.abs(n.daysRemaining)} day${
+                            n.daysRemaining === -1 ? "" : "s"
+                          } ago`}
                     </Text>
                   </View>
                 </Pressable>

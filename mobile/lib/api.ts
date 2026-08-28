@@ -1,75 +1,48 @@
-import { authClient } from "./auth-client";
+import * as SecureStore from "expo-secure-store";
 import { API_URL } from "./config";
 
-export interface WarrantyInfo {
-  status: "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "NO_WARRANTY";
-  daysRemaining: number | null;
-  fractionElapsed: number | null;
+/**
+ * The vault itself is local (see lib/vault.ts) — the server is only used for
+ * stateless AI helpers: reading a receipt, identifying a barcode, finding a
+ * claim contact or a product image. Nothing personal is stored server-side.
+ *
+ * Those endpoints are keyed by an opaque device id purely so they can be
+ * rate limited. It carries no identity and unlocks nothing.
+ */
+
+const DEVICE_ID_KEY = "warranty-vault.device-id";
+
+function generateDeviceId(): string {
+  const alphabet =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  let out = "";
+  for (let i = 0; i < 32; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
 }
 
-export interface ApiAsset {
-  id: string;
-  type: string;
-  fileName: string;
-  mimeType: string;
-}
+let cachedDeviceId: string | null = null;
 
-export interface ApiClaim {
-  id: string;
-  status: string;
-  claimNumber: string | null;
-  providerContact: string | null;
-  issueDescription: string;
-  submittedAt: string | null;
-  resolvedAt: string | null;
-  resolutionNotes: string | null;
-  createdAt: string;
-}
-
-export interface ApiItem {
-  id: string;
-  brand: string;
-  modelName: string;
-  category: string;
-  serialNumber: string | null;
-  purchaseDate: string | null;
-  purchasePrice: string | null;
-  currency: string;
-  storeName: string | null;
-  warrantyType: string;
-  warrantyProvider: string | null;
-  warrantyDurationMonths: number | null;
-  warrantyExpirationDate: string | null;
-  warrantyAssumed: boolean;
-  barcode: string | null;
-  /** Illustrative web image; only used when the user has no product photo. */
-  imageUrl: string | null;
-  imageSource: string | null;
-  imageCheckedAt: string | null;
-  notes: string | null;
-  archived: boolean;
-  createdAt: string;
-  warranty: WarrantyInfo;
-  hasReceipt: boolean;
-  hasOpenClaim: boolean;
-  assets: ApiAsset[];
-  claims: ApiClaim[];
-}
-
-export interface ApiSettings {
-  reminderLeadDays: number;
-  currency: string;
-  theme?: string;
-}
-
-export interface ApiNotification {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  read: boolean;
-  productItemId: string;
-  createdAt: string;
+export function deviceId(): string {
+  if (cachedDeviceId) return cachedDeviceId;
+  try {
+    const stored = SecureStore.getItem(DEVICE_ID_KEY);
+    if (stored && /^[A-Za-z0-9_-]{16,128}$/.test(stored)) {
+      cachedDeviceId = stored;
+      return stored;
+    }
+  } catch {
+    // Fall through and mint a fresh one for this session.
+  }
+  const fresh = generateDeviceId();
+  cachedDeviceId = fresh;
+  try {
+    SecureStore.setItem(DEVICE_ID_KEY, fresh);
+  } catch {
+    // Non-fatal: a per-session id still works for rate limiting.
+  }
+  return fresh;
 }
 
 export interface ExtractionResult {
@@ -93,24 +66,23 @@ export interface BarcodeProduct {
   warrantyMonths: number | null;
 }
 
-export function authHeaders(): Record<string, string> {
-  const cookie = authClient.getCookie();
-  return cookie ? { Cookie: cookie } : {};
+export interface ClaimContactInfo {
+  kind: "MANUFACTURER" | "RETAILER";
+  name: string;
+  displayName: string;
+  email: string | null;
+  url: string | null;
+  phone: string | null;
+  source: string;
+  notes: string | null;
 }
 
-export function fileUrl(assetId: string) {
-  return `${API_URL}/api/files/${assetId}`;
-}
-
-/** Fetch wrapper: attaches the session cookie, raises on error payloads. */
-export async function api<T>(
-  path: string,
-  init: RequestInit = {}
-): Promise<T> {
+/** Fetch wrapper for the AI helper endpoints. */
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
-      ...authHeaders(),
+      "x-device-id": deviceId(),
       ...(init.body && !(init.body instanceof FormData)
         ? { "Content-Type": "application/json" }
         : {}),
@@ -123,12 +95,6 @@ export async function api<T>(
     throw new Error(json.error ?? `Request failed (${res.status})`);
   }
   return json as T;
-}
-
-export async function apiRaw(path: string): Promise<Response> {
-  const res = await fetch(`${API_URL}${path}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
-  return res;
 }
 
 /** React Native FormData file part from a local file URI. */

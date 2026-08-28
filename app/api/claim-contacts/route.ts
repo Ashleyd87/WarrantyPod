@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser, unauthorized } from "@/lib/api-helpers";
+import { getDeviceId, missingDevice } from "@/lib/device-auth";
 import { lookupClaimContact } from "@/lib/claim-contacts";
 import { isMockMode } from "@/lib/extraction";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -16,8 +16,8 @@ const LOOKUP_WINDOW_MS = 60_000; // per minute per user
  * trigger an AI web-search when an Anthropic key is configured.
  */
 export async function GET(request: NextRequest) {
-  const user = await getApiUser();
-  if (!user) return unauthorized();
+  const deviceId = getDeviceId(request);
+  if (!deviceId) return missingDevice();
 
   const brand = request.nextUrl.searchParams.get("brand")?.trim() ?? "";
   const store = request.nextUrl.searchParams.get("store")?.trim() ?? "";
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
 
   const limit = checkRateLimit(
-    `contacts:${user.id}`,
+    `contacts:${deviceId}`,
     LOOKUP_LIMIT,
     LOOKUP_WINDOW_MS
   );

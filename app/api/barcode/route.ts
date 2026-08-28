@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser, unauthorized } from "@/lib/api-helpers";
+import { getDeviceId, missingDevice } from "@/lib/device-auth";
 import { isProductBarcode, lookupBarcode } from "@/lib/barcode-lookup";
 import { isMockMode } from "@/lib/extraction";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -16,8 +16,8 @@ const WINDOW_MS = 60_000; // per minute per user
  * (e.g. a Code128 service label) or nothing was found.
  */
 export async function GET(request: NextRequest) {
-  const user = await getApiUser();
-  if (!user) return unauthorized();
+  const deviceId = getDeviceId(request);
+  if (!deviceId) return missingDevice();
 
   const code = request.nextUrl.searchParams.get("code")?.trim() ?? "";
   if (!code) {
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ product: null, reason: "not-a-product-barcode" });
   }
 
-  const limit = checkRateLimit(`barcode:${user.id}`, LIMIT, WINDOW_MS);
+  const limit = checkRateLimit(`barcode:${deviceId}`, LIMIT, WINDOW_MS);
   if (!limit.ok) {
     return NextResponse.json(
       { error: `Too many lookups — try again in ${limit.retryAfterSeconds}s` },

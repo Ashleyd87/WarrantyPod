@@ -1,13 +1,13 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import type { ApiItem } from "@/lib/api";
+import type { VaultItemView } from "@/lib/vault";
 import { formatDate, formatMoney } from "@/lib/format";
 import { fonts, ink } from "@/lib/theme";
 import { Chip, ChevronCircle } from "./ui";
 
 /** S1-style list row: chips line, 15/700 title, 12.5 sub, chevron circle. */
-export function ItemRow({ item }: { item: ApiItem }) {
+export function ItemRow({ item }: { item: VaultItemView }) {
   const router = useRouter();
   const days = item.warranty.daysRemaining;
   const status = item.warranty.status;

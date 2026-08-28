@@ -9,15 +9,16 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { Directory, File, Paths } from "expo-file-system";
+import * as DocumentPicker from "expo-document-picker";
 import * as Linking from "expo-linking";
 import * as MailComposer from "expo-mail-composer";
 import * as Sharing from "expo-sharing";
 import * as StoreReview from "expo-store-review";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
-import { api, apiRaw, type ApiItem, type ApiSettings } from "@/lib/api";
-import { authClient, useSessionUser } from "@/lib/auth-client";
+import { createBackup, createCsv, restoreBackup } from "@/lib/backup";
+import { eraseVault } from "@/lib/app-reset";
+import { vault, type VaultItemView, type VaultSettings } from "@/lib/vault";
 import { formatMoney, userInitial } from "@/lib/format";
 import {
   fonts,
@@ -43,19 +44,15 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { t, themeName, setTheme } = useTheme();
   const { start: startTour } = useTour();
-  const { user } = useSessionUser();
-  const [items, setItems] = useState<ApiItem[]>([]);
-  const [settings, setSettings] = useState<ApiSettings | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const [items, setItems] = useState<VaultItemView[]>([]);
+  const [settings, setSettings] = useState<VaultSettings | null>(null);
+  const [busy, setBusy] = useState<null | "backup" | "csv" | "restore">(null);
 
   const load = useCallback(async () => {
     try {
-      const [itemsRes, settingsRes] = await Promise.all([
-        api<{ items: ApiItem[] }>("/api/items"),
-        api<{ settings: ApiSettings }>("/api/settings"),
-      ]);
-      setItems(itemsRes.items);
-      setSettings(settingsRes.settings);
+      const [list, s] = await Promise.all([vault.listItems(), vault.settings()]);
+      setItems(list);
+      setSettings(s);
     } catch {
       // keep last data
     }
@@ -84,26 +81,92 @@ export default function ProfileScreen() {
     0
   );
 
-  const name = user?.name || "You";
-  const email = user?.email ?? "";
+  const owner = settings?.owner;
+  const name = owner?.name || "You";
+  const email = owner?.email ?? "";
 
   async function exportCsv() {
-    setExporting(true);
+    setBusy("csv");
     try {
-      const res = await apiRaw("/api/export/csv");
-      const csv = await res.text();
-      const dir = new Directory(Paths.cache, "exports");
-      if (!dir.exists) dir.create();
-      const file = new File(dir, "warranty-vault-export.csv");
-      if (file.exists) file.delete();
-      file.create();
-      file.write(csv);
+      const file = await createCsv();
       await Sharing.shareAsync(file.uri, { mimeType: "text/csv" });
     } catch (e) {
       Alert.alert("Export failed", e instanceof Error ? e.message : "Try again.");
     } finally {
-      setExporting(false);
+      setBusy(null);
     }
+  }
+
+  /**
+   * The vault exists only on this phone, so a backup is the sole protection
+   * against a lost or wiped device. One file carries records and photos.
+   */
+  async function exportBackup() {
+    setBusy("backup");
+    try {
+      const file = await createBackup();
+      await Sharing.shareAsync(file.uri, { mimeType: "application/json" });
+    } catch (e) {
+      Alert.alert("Backup failed", e instanceof Error ? e.message : "Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function importBackup() {
+    Alert.alert(
+      "Restore from backup?",
+      "This replaces everything currently in the vault with the contents of the backup file. It cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Choose file",
+          style: "destructive",
+          onPress: async () => {
+            const picked = await DocumentPicker.getDocumentAsync({
+              type: ["application/json", "application/octet-stream"],
+              copyToCacheDirectory: true,
+            });
+            if (picked.canceled || !picked.assets?.[0]) return;
+            setBusy("restore");
+            try {
+              const r = await restoreBackup(picked.assets[0].uri);
+              await load();
+              Alert.alert(
+                "Vault restored",
+                `${r.items} item${r.items === 1 ? "" : "s"} and ${r.photos} photo${r.photos === 1 ? "" : "s"} recovered.`
+              );
+            } catch (e) {
+              Alert.alert(
+                "Restore failed",
+                e instanceof Error ? e.message : "Try again."
+              );
+            } finally {
+              setBusy(null);
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  function confirmErase() {
+    Alert.alert(
+      "Delete everything?",
+      "Every item, photo and claim on this device is removed. There is no cloud copy — export a backup first if you might want any of it back.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete all",
+          style: "destructive",
+          onPress: async () => {
+            await eraseVault();
+            await load();
+            Alert.alert("Vault cleared", "The vault is now empty.");
+          },
+        },
+      ]
+    );
   }
 
   const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
@@ -121,7 +184,6 @@ export default function ProfileScreen() {
       `App version: ${APP_VERSION}`,
       `Platform: ${Platform.OS} ${Platform.Version}`,
       `Items in vault: ${items.filter((i) => !i.archived).length}`,
-      `Account: ${email || "unknown"}`,
     ].join("\n");
     try {
       if (await MailComposer.isAvailableAsync()) {
@@ -275,7 +337,7 @@ export default function ProfileScreen() {
 
         {/* Identity */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-          <Avatar letter={userInitial(user)} size={64} />
+          <Avatar letter={userInitial(owner)} size={64} />
           <View style={{ gap: 3 }}>
             <Text
               style={{
@@ -346,27 +408,65 @@ export default function ProfileScreen() {
               onPress={() => router.push("/alerts")}
             />
             <SettingsRow
-              icon={<Feather name="users" size={19} color={ink.ink} />}
-              title="Household members"
-              sub="Coming soon"
-              disabled
+              icon={<Feather name="user" size={19} color={ink.ink} />}
+              title="Your details"
+              sub={
+                owner?.name
+                  ? [owner.name, owner.email].filter(Boolean).join(" · ")
+                  : "Needed on every warranty claim"
+              }
+              onPress={() => router.push("/owner")}
+            />
+          </ListGroup>
+        </View>
+
+        {/* Backup — the vault is on this device only */}
+        <View style={{ gap: 12 }}>
+          <SectionLabel>Backup</SectionLabel>
+          <ListGroup>
+            <SettingsRow
+              icon={<Feather name="save" size={19} color={ink.ink} />}
+              title="Export a backup"
+              sub={
+                busy === "backup"
+                  ? "Packing records and photos…"
+                  : "One file with every record and photo"
+              }
+              onPress={exportBackup}
             />
             <SettingsRow
-              icon={<Feather name="download" size={19} color={ink.ink} />}
-              title="Export all data"
-              sub={exporting ? "Preparing…" : "Full inventory, CSV"}
+              icon={<Feather name="upload" size={19} color={ink.ink} />}
+              title="Restore from backup"
+              sub={busy === "restore" ? "Restoring…" : "Replaces the current vault"}
+              onPress={importBackup}
+            />
+            <SettingsRow
+              icon={<Feather name="grid" size={19} color={ink.ink} />}
+              title="Export as spreadsheet"
+              sub={busy === "csv" ? "Preparing…" : "CSV for insurance or records"}
               onPress={exportCsv}
             />
             <SettingsRow
-              icon={<Feather name="log-out" size={19} color={ink.ink} />}
-              title="Sign out"
+              icon={<Feather name="trash-2" size={19} color={ink.ink} />}
+              title="Delete all data"
+              sub="Erases this device's vault permanently"
               chevron={false}
-              onPress={async () => {
-                await authClient.signOut();
-                router.replace("/welcome");
-              }}
+              onPress={confirmErase}
             />
           </ListGroup>
+          <Text
+            style={{
+              fontFamily: fonts.regular,
+              fontSize: 12,
+              lineHeight: 18,
+              color: ink.textSecondary,
+              paddingHorizontal: 4,
+            }}
+          >
+            Your vault is stored only on this phone — there is no account and
+            nothing is uploaded. Export a backup regularly so a lost or wiped
+            device doesn&apos;t take your records with it.
+          </Text>
         </View>
 
         {/* Help & feedback */}

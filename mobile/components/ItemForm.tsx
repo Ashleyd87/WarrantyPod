@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Image, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { api, filePart, type ApiItem, type ExtractionResult } from "@/lib/api";
+import { api, filePart, type ExtractionResult } from "@/lib/api";
+import { vault, type VaultItemView } from "@/lib/vault";
+import { computeExpirationDate } from "@/lib/warranty";
 import type { PendingPhoto, Prefill } from "@/lib/add-flow";
 import {
   CATEGORIES,
@@ -58,7 +60,7 @@ const EMPTY: ItemFormValues = {
   notes: "",
 };
 
-export function itemToFormValues(item: ApiItem): ItemFormValues {
+export function itemToFormValues(item: VaultItemView): ItemFormValues {
   return {
     brand: item.brand,
     modelName: item.modelName,
@@ -106,7 +108,7 @@ export function ItemForm({
   initialPrefill?: Prefill | null;
   defaultCurrency?: string;
   autoExtract?: boolean;
-  onSaved: (item: ApiItem) => void;
+  onSaved: (item: VaultItemView) => void;
 }) {
   const { t } = useTheme();
   const [values, setValues] = useState<ItemFormValues>({
@@ -255,19 +257,50 @@ export function ItemForm({
     }
     setSaving(true);
     try {
-      const fd = new FormData();
-      for (const [k, v] of Object.entries(values)) {
-        fd.append(k, typeof v === "boolean" ? (v ? "true" : "") : v);
+      const months = values.warrantyDurationMonths
+        ? parseInt(values.warrantyDurationMonths, 10)
+        : null;
+      const purchaseDate = values.purchaseDate
+        ? new Date(`${values.purchaseDate}T00:00:00Z`).toISOString()
+        : null;
+      const record = {
+        brand: values.brand.trim(),
+        modelName: values.modelName.trim(),
+        category: values.category,
+        serialNumber: values.serialNumber.trim() || null,
+        barcode: values.barcode.trim() || null,
+        purchaseDate,
+        purchasePrice: values.purchasePrice.trim() || null,
+        currency: values.currency.trim().toUpperCase() || "USD",
+        storeName: values.storeName.trim() || null,
+        warrantyType: values.warrantyType,
+        warrantyProvider: values.warrantyProvider.trim() || null,
+        warrantyDurationMonths: Number.isFinite(months) ? months : null,
+        warrantyExpirationDate: values.warrantyExpirationDate
+          ? new Date(`${values.warrantyExpirationDate}T00:00:00Z`).toISOString()
+          : computeExpirationDate(purchaseDate, months),
+        warrantyAssumed: values.warrantyAssumed,
+        notes: values.notes.trim() || null,
+      };
+
+      let saved: VaultItemView | null;
+      if (mode === "create") {
+        saved = await vault.createItem({
+          ...record,
+          imageUrl: null,
+          imageSource: null,
+          imageCheckedAt: null,
+        });
+      } else {
+        saved = await vault.updateItem(itemId!, record);
       }
-      photos.forEach((p, i) => {
-        fd.append("assetFile", filePart(p.uri, `${PHOTO_LABELS[p.assetType] ?? "photo"}-${i}.jpg`));
-        fd.append("assetType", p.assetType);
-      });
-      const { item } = await api<{ item: ApiItem }>(
-        mode === "create" ? "/api/items" : `/api/items/${itemId}`,
-        { method: mode === "create" ? "POST" : "PATCH", body: fd }
-      );
-      onSaved(item);
+      if (!saved) throw new Error("That item no longer exists.");
+
+      for (const p of photos) {
+        await vault.addAsset(saved.id, p.uri, p.assetType);
+      }
+      const fresh = (await vault.getItem(saved.id)) ?? saved;
+      onSaved(fresh);
     } catch (e) {
       Alert.alert("Save failed", e instanceof Error ? e.message : "Try again.");
     } finally {

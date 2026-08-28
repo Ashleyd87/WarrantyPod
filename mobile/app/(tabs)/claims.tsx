@@ -3,7 +3,7 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native"
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { api, type ApiClaim, type ApiItem } from "@/lib/api";
+import { vault, type VaultClaim, type VaultItemView } from "@/lib/vault";
 import { CLAIM_STATUS_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
@@ -20,8 +20,8 @@ import {
 } from "@/components/ui";
 
 interface ClaimEntry {
-  claim: ApiClaim;
-  item: ApiItem;
+  claim: VaultClaim;
+  item: VaultItemView;
 }
 
 const OPEN = ["DRAFT", "SUBMITTED", "IN_REVIEW"];
@@ -33,9 +33,9 @@ export default function ClaimsScreen() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ items: ApiItem[] }>("/api/items");
+      const items = await vault.listItems();
       const all: ClaimEntry[] = [];
-      for (const item of data.items) {
+      for (const item of items) {
         for (const claim of item.claims) all.push({ claim, item });
       }
       all.sort((a, b) => b.claim.createdAt.localeCompare(a.claim.createdAt));
