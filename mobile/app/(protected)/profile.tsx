@@ -10,7 +10,12 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { Directory, File, Paths } from "expo-file-system";
+import * as Linking from "expo-linking";
+import * as MailComposer from "expo-mail-composer";
 import * as Sharing from "expo-sharing";
+import * as StoreReview from "expo-store-review";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { api, apiRaw, type ApiItem, type ApiSettings } from "@/lib/api";
 import { authClient, useSessionUser } from "@/lib/auth-client";
 import { formatMoney, userInitial } from "@/lib/format";
@@ -23,6 +28,7 @@ import {
   type ThemeName,
 } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
+import { useTour } from "@/lib/tour-context";
 import { Header } from "@/components/Header";
 import {
   Avatar,
@@ -36,6 +42,7 @@ import {
 export default function ProfileScreen() {
   const router = useRouter();
   const { t, themeName, setTheme } = useTheme();
+  const { start: startTour } = useTour();
   const { user } = useSessionUser();
   const [items, setItems] = useState<ApiItem[]>([]);
   const [settings, setSettings] = useState<ApiSettings | null>(null);
@@ -97,6 +104,75 @@ export default function ProfileScreen() {
     } finally {
       setExporting(false);
     }
+  }
+
+  const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
+  const ANDROID_PACKAGE =
+    Constants.expoConfig?.android?.package ?? "com.ashley.warrantyvault";
+  const SUPPORT_EMAIL = "ashley_d_87@hotmail.com";
+
+  /** Pre-filled support email with the diagnostics that make a report useful. */
+  async function sendFeedback() {
+    const body = [
+      "",
+      "",
+      "— — —",
+      "Sent from Serial Vault. The details below help us debug:",
+      `App version: ${APP_VERSION}`,
+      `Platform: ${Platform.OS} ${Platform.Version}`,
+      `Items in vault: ${items.filter((i) => !i.archived).length}`,
+      `Account: ${email || "unknown"}`,
+    ].join("\n");
+    try {
+      if (await MailComposer.isAvailableAsync()) {
+        await MailComposer.composeAsync({
+          recipients: [SUPPORT_EMAIL],
+          subject: `Serial Vault feedback (v${APP_VERSION})`,
+          body,
+        });
+        return;
+      }
+    } catch {
+      // fall through to the mailto: handoff
+    }
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+      `Serial Vault feedback (v${APP_VERSION})`
+    )}&body=${encodeURIComponent(body)}`;
+    Linking.openURL(url).catch(() =>
+      Alert.alert("No mail app", `Email us at ${SUPPORT_EMAIL}`)
+    );
+  }
+
+  /** In-app review sheet where the OS allows it, store listing otherwise. */
+  async function rateApp() {
+    try {
+      if (
+        (await StoreReview.hasAction()) &&
+        (await StoreReview.isAvailableAsync())
+      ) {
+        await StoreReview.requestReview();
+        return;
+      }
+    } catch {
+      // fall through to the store listing
+    }
+    const storeUrl =
+      Platform.OS === "android"
+        ? `market://details?id=${ANDROID_PACKAGE}`
+        : StoreReview.storeUrl() ?? "";
+    if (!storeUrl) {
+      Alert.alert(
+        "Not published yet",
+        "Rating opens once the app is live on the store. Use “Send feedback” to tell us what you think."
+      );
+      return;
+    }
+    Linking.openURL(storeUrl).catch(() =>
+      Alert.alert(
+        "Couldn't open the store",
+        "Search for Serial Vault in the Play Store to leave a rating."
+      )
+    );
   }
 
   function themeCircle(name: ThemeName) {
@@ -289,6 +365,35 @@ export default function ProfileScreen() {
                 await authClient.signOut();
                 router.replace("/welcome");
               }}
+            />
+          </ListGroup>
+        </View>
+
+        {/* Help & feedback */}
+        <View style={{ gap: 12 }}>
+          <SectionLabel>Help & feedback</SectionLabel>
+          <ListGroup>
+            <SettingsRow
+              icon={<Feather name="compass" size={19} color={ink.ink} />}
+              title="Take the tour"
+              sub="Replay the guided walkthrough"
+              onPress={() => {
+                // The tour spotlights Home, so go there before it starts.
+                router.dismissTo("/(tabs)");
+                setTimeout(startTour, 350);
+              }}
+            />
+            <SettingsRow
+              icon={<Feather name="message-square" size={19} color={ink.ink} />}
+              title="Send feedback"
+              sub="Report a bug or request a feature"
+              onPress={sendFeedback}
+            />
+            <SettingsRow
+              icon={<Feather name="star" size={19} color={ink.ink} />}
+              title="Rate this app"
+              sub="Tell others what you think"
+              onPress={rateApp}
             />
           </ListGroup>
         </View>

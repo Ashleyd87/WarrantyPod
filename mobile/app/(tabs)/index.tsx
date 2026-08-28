@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -13,6 +13,7 @@ import { api, type ApiItem } from "@/lib/api";
 import { useSessionUser } from "@/lib/auth-client";
 import { formatDate, userInitial } from "@/lib/format";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
+import { useTour, useTourTarget } from "@/lib/tour-context";
 import {
   Avatar,
   Card,
@@ -49,6 +50,18 @@ export default function HomeScreen() {
   const [items, setItems] = useState<ApiItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const { start: startTour, seen: tourSeen, active: tourActive } = useTour();
+  const summaryRef = useTourTarget("home-summary");
+  const categoriesRef = useTourTarget("home-categories");
+  const expiringRef = useTourTarget("home-expiring");
+  const addRef = useTourTarget("home-add");
+
+  // First visit after signing in: run the tour once layout has settled.
+  useEffect(() => {
+    if (tourSeen() || tourActive) return;
+    const id = setTimeout(startTour, 700);
+    return () => clearTimeout(id);
+  }, [startTour, tourSeen, tourActive]);
 
   const load = useCallback(async () => {
     try {
@@ -123,9 +136,9 @@ export default function HomeScreen() {
           <CircleBtn
             borderless
             icon={<Feather name="search" size={22} color={ink.ink} />}
-            onPress={() => router.push("/items")}
+            onPress={() => router.push("/items?focus=1")}
           />
-          <View style={{ alignItems: "center" }}>
+          <View ref={summaryRef} collapsable={false} style={{ alignItems: "center" }}>
             <Text
               style={{ fontFamily: fonts.medium, fontSize: 11, color: ink.textMuted }}
             >
@@ -143,7 +156,7 @@ export default function HomeScreen() {
         {/* Category */}
         <View style={{ gap: 12 }}>
           <SectionLabel>Category</SectionLabel>
-          <View style={{ flexDirection: "row", gap: 10 }}>
+          <View ref={categoriesRef} collapsable={false} style={{ flexDirection: "row", gap: 10 }}>
             {CATEGORY_CARDS.map((c) => (
               <Pressable
                 key={c.key}
@@ -196,7 +209,11 @@ export default function HomeScreen() {
           </View>
 
           {soonList.length === 0 ? (
-            <Card style={{ alignItems: "center", gap: 14, paddingVertical: 30 }}>
+            <Card
+              ref={expiringRef}
+              collapsable={false}
+              style={{ alignItems: "center", gap: 14, paddingVertical: 30 }}
+            >
               <Text
                 style={{ fontFamily: fonts.extrabold, fontSize: 16, color: ink.ink }}
               >
@@ -213,12 +230,6 @@ export default function HomeScreen() {
               >
                 Snap a receipt and a serial sticker — AI does the data entry.
               </Text>
-              <Pill
-                label="Add to vault"
-                arrow
-                height={50}
-                onPress={() => router.push("/add")}
-              />
               <Pressable onPress={loadSamples} disabled={seeding} hitSlop={8}>
                 <Text
                   style={{
@@ -233,7 +244,7 @@ export default function HomeScreen() {
               </Pressable>
             </Card>
           ) : (
-            <ListGroup>
+            <ListGroup ref={expiringRef} collapsable={false}>
               {soonList.slice(0, 3).map((item) => {
                 const days = item.warranty.daysRemaining;
                 return (
@@ -291,9 +302,10 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {items.length > 0 && (
+        {/* Primary action always sits here, so its position never moves. */}
+        <View ref={addRef} collapsable={false}>
           <Pill label="Add to vault" arrow onPress={() => router.push("/add")} />
-        )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

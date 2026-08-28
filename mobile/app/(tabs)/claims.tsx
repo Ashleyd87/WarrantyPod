@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -15,6 +15,7 @@ import {
   EmptyState,
   Headline,
   ListGroup,
+  Pill,
   SectionLabel,
 } from "@/components/ui";
 
@@ -28,6 +29,7 @@ const OPEN = ["DRAFT", "SUBMITTED", "IN_REVIEW"];
 export default function ClaimsScreen() {
   const router = useRouter();
   const [entries, setEntries] = useState<ClaimEntry[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -111,6 +113,16 @@ export default function ClaimsScreen() {
           paddingBottom: 120,
           gap: 18,
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+          />
+        }
       >
         <Header
           title="Claims"
@@ -124,10 +136,18 @@ export default function ClaimsScreen() {
         <Headline>When something{"\n"}breaks, be ready.</Headline>
 
         {entries.length === 0 ? (
-          <EmptyState
-            title="No claims yet"
-            body="Open any item and tap “Build claim package” when something goes wrong — everything you need in one PDF."
-          />
+          <View style={{ gap: 14 }}>
+            <EmptyState
+              title="No claims yet"
+              body="Open any item and tap “Build claim package” when something goes wrong — everything you need in one PDF."
+            />
+            <Pill
+              label="Browse your items"
+              variant="white"
+              height={50}
+              onPress={() => router.push("/items")}
+            />
+          </View>
         ) : (
           <>
             {open.length > 0 && (

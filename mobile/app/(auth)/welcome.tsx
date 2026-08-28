@@ -12,7 +12,6 @@ import {
 import { Redirect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
-import { Feather } from "@expo/vector-icons";
 import { ONBOARDED_KEY } from "@/lib/app-reset";
 import { useSessionUser } from "@/lib/auth-client";
 import { fonts } from "@/lib/theme";
@@ -112,12 +111,10 @@ export default function OnboardingScreen() {
               style={{
                 width,
                 paddingHorizontal: 30,
-                paddingTop: 26,
+                paddingTop: 8,
                 alignItems: "center",
               }}
             >
-              {/* Key logomark */}
-              <Feather name="key" size={30} color={t.splashInk} />
               <View
                 style={{
                   flex: 1,

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { fonts, ink, SCREEN_PAD } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
+import { useTour } from "@/lib/tour-context";
 
 const TAB_META: Record<
   string,
@@ -42,6 +43,7 @@ interface TabBarProps {
 /** Floating 64px ink pill bar; active tab = accent pill with ink icon + label. */
 export function TabBar({ state, navigation }: TabBarProps) {
   const { t } = useTheme();
+  const { register } = useTour();
   const insets = useSafeAreaInsets();
 
   return (
@@ -111,6 +113,7 @@ export function TabBar({ state, navigation }: TabBarProps) {
           return (
             <Pressable
               key={route.key}
+              ref={(node) => register(`tab-${route.name}`, node)}
               onPress={onPress}
               style={({ pressed }) => ({
                 flex: 1,

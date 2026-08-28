@@ -292,19 +292,20 @@ export function ChipRow<T extends string | number>({
 
 /* ---------- Cards & list groups ---------- */
 
-export function Card({
-  children,
-  style,
-  radius = 20,
-  inkBg = false,
-}: {
-  children: React.ReactNode;
-  style?: ViewStyle;
-  radius?: number;
-  inkBg?: boolean;
-}) {
+export const Card = React.forwardRef<
+  View,
+  {
+    children: React.ReactNode;
+    style?: ViewStyle;
+    radius?: number;
+    inkBg?: boolean;
+    collapsable?: boolean;
+  }
+>(function Card({ children, style, radius = 20, inkBg = false, collapsable }, ref) {
   return (
     <View
+      ref={ref}
+      collapsable={collapsable}
       style={[
         {
           backgroundColor: inkBg ? ink.ink : ink.card,
@@ -319,19 +320,18 @@ export function Card({
       {children}
     </View>
   );
-}
+});
 
 /** 22px-radius list container: 6px outer padding, hairline row dividers. */
-export function ListGroup({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: ViewStyle;
-}) {
+export const ListGroup = React.forwardRef<
+  View,
+  { children: React.ReactNode; style?: ViewStyle; collapsable?: boolean }
+>(function ListGroup({ children, style, collapsable }, ref) {
   const items = React.Children.toArray(children);
   return (
     <View
+      ref={ref}
+      collapsable={collapsable}
       style={[
         {
           backgroundColor: ink.card,
@@ -357,7 +357,7 @@ export function ListGroup({
       ))}
     </View>
   );
-}
+});
 
 export function ChevronCircle({ size = 34 }: { size?: number }) {
   return (

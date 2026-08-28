@@ -19,6 +19,8 @@ import {
 import { resetLocalAppData } from "@/lib/app-reset";
 import { ink } from "@/lib/theme";
 import { ThemeProvider } from "@/lib/theme-context";
+import { TourProvider } from "@/lib/tour-context";
+import { TourOverlay } from "@/components/TourOverlay";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -135,13 +137,16 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: ink.paper },
-        }}
-      />
+      <TourProvider>
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: ink.paper },
+          }}
+        />
+        <TourOverlay />
+      </TourProvider>
     </ThemeProvider>
   );
 }
