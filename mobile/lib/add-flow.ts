@@ -7,9 +7,18 @@ export interface PendingPhoto {
   assetType: string;
 }
 
+/** Fields identified before the form opens (e.g. from a barcode lookup). */
+export interface Prefill {
+  brand?: string;
+  modelName?: string;
+  category?: string;
+  warrantyDurationMonths?: string;
+}
+
 let photos: PendingPhoto[] = [];
 let serial: string | null = null;
 let barcode: string | null = null;
+let prefill: Prefill | null = null;
 
 export const addFlow = {
   addPhoto(p: PendingPhoto) {
@@ -21,15 +30,20 @@ export const addFlow = {
   setBarcode(b: string) {
     barcode = b;
   },
+  setPrefill(p: Prefill) {
+    prefill = { ...prefill, ...p };
+  },
   takeAll(): {
     photos: PendingPhoto[];
     serial: string | null;
     barcode: string | null;
+    prefill: Prefill | null;
   } {
-    const out = { photos, serial, barcode };
+    const out = { photos, serial, barcode, prefill };
     photos = [];
     serial = null;
     barcode = null;
+    prefill = null;
     return out;
   },
   peekCount(): number {
@@ -39,5 +53,6 @@ export const addFlow = {
     photos = [];
     serial = null;
     barcode = null;
+    prefill = null;
   },
 };

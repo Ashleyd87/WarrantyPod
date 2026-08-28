@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { api, filePart, type ExtractionResult } from "@/lib/api";
+import { api, filePart, type BarcodeProduct, type ExtractionResult } from "@/lib/api";
 import { addFlow } from "@/lib/add-flow";
 import { fonts, ink } from "@/lib/theme";
 import { useTheme } from "@/lib/theme-context";
@@ -75,6 +75,7 @@ export default function CameraScreen() {
     kind: "serial" | "barcode";
   } | null>(null);
   const [count, setCount] = useState(addFlow.peekCount());
+  const [accepting, setAccepting] = useState(false);
   // Guards against the scanner firing dozens of times per second on one label.
   const lastScan = useRef<string>("");
 
@@ -148,19 +149,46 @@ export default function CameraScreen() {
     setDetected({ value, confidence: "high", kind: "barcode" });
   }
 
-  function acceptDetected() {
-    if (!detected) return;
-    if (detected.kind === "barcode") {
-      addFlow.setBarcode(detected.value);
-      // A UPC/EAN identifies the product, not the unit, so it must not be
-      // filed as a serial number. Longer codes are usually the serial.
-      if (!/^\d{8}$|^\d{12,14}$/.test(detected.value)) {
-        addFlow.setSerial(detected.value);
-      }
-    } else {
+  async function acceptDetected() {
+    if (!detected || accepting) return;
+    if (detected.kind === "serial") {
       addFlow.setSerial(detected.value);
+      router.replace("/add/form");
+      return;
     }
-    router.replace("/add/form");
+
+    addFlow.setBarcode(detected.value);
+    // A UPC/EAN identifies the product, not the unit, so it must not be
+    // filed as a serial number. Longer codes are usually the serial.
+    const isProductCode = /^\d{8}$|^\d{12,14}$/.test(detected.value);
+    if (!isProductCode) {
+      addFlow.setSerial(detected.value);
+      router.replace("/add/form");
+      return;
+    }
+
+    // Product code — try to identify it so the form opens already filled in.
+    setAccepting(true);
+    try {
+      const { product } = await api<{ product: BarcodeProduct | null }>(
+        `/api/barcode?code=${encodeURIComponent(detected.value)}`
+      );
+      if (product?.brand || product?.modelName) {
+        addFlow.setPrefill({
+          ...(product.brand ? { brand: product.brand } : {}),
+          ...(product.modelName ? { modelName: product.modelName } : {}),
+          ...(product.category ? { category: product.category } : {}),
+          ...(product.warrantyMonths
+            ? { warrantyDurationMonths: String(product.warrantyMonths) }
+            : {}),
+        });
+      }
+    } catch {
+      // Lookup is a convenience — the barcode is saved either way.
+    } finally {
+      setAccepting(false);
+      router.replace("/add/form");
+    }
   }
 
   function close() {
@@ -372,9 +400,13 @@ export default function CameraScreen() {
                   opacity: pressed ? 0.85 : 1,
                 })}
               >
-                <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: "#FFFFFF" }}>
-                  Use
-                </Text>
+                {accepting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={{ fontFamily: fonts.bold, fontSize: 14, color: "#FFFFFF" }}>
+                    Use
+                  </Text>
+                )}
               </Pressable>
             </View>
           )}

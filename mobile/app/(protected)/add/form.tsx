@@ -13,11 +13,7 @@ export default function AddFormScreen() {
   const router = useRouter();
   const [currency, setCurrency] = useState("USD");
   // Photos/serial captured in the camera or email screens.
-  const flowRef = useRef<{
-    photos: PendingPhoto[];
-    serial: string | null;
-    barcode: string | null;
-  }>(addFlow.takeAll());
+  const flowRef = useRef(addFlow.takeAll());
 
   useFocusEffect(
     useCallback(() => {
@@ -50,6 +46,7 @@ export default function AddFormScreen() {
             initialPhotos={flowRef.current.photos}
             initialSerial={flowRef.current.serial}
             initialBarcode={flowRef.current.barcode}
+            initialPrefill={flowRef.current.prefill}
             autoExtract={flowRef.current.photos.length > 0}
             onSaved={(item) => router.replace(`/item/${item.id}`)}
           />

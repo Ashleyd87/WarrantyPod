@@ -3,7 +3,7 @@ import { Alert, Image, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { api, filePart, type ApiItem, type ExtractionResult } from "@/lib/api";
-import type { PendingPhoto } from "@/lib/add-flow";
+import type { PendingPhoto, Prefill } from "@/lib/add-flow";
 import {
   CATEGORIES,
   CATEGORY_LABELS,
@@ -92,6 +92,7 @@ export function ItemForm({
   initialPhotos = [],
   initialSerial = null,
   initialBarcode = null,
+  initialPrefill = null,
   defaultCurrency = "USD",
   autoExtract = false,
   onSaved,
@@ -102,6 +103,7 @@ export function ItemForm({
   initialPhotos?: PendingPhoto[];
   initialSerial?: string | null;
   initialBarcode?: string | null;
+  initialPrefill?: Prefill | null;
   defaultCurrency?: string;
   autoExtract?: boolean;
   onSaved: (item: ApiItem) => void;
@@ -113,6 +115,8 @@ export function ItemForm({
     ...(initialValues ?? {}),
     ...(initialSerial ? { serialNumber: initialSerial } : {}),
     ...(initialBarcode ? { barcode: initialBarcode } : {}),
+    // Identified from a scanned product barcode before the form opened.
+    ...(initialPrefill ?? {}),
   });
   const [photos, setPhotos] = useState<PendingPhoto[]>(initialPhotos);
   const [confidence, setConfidence] = useState<

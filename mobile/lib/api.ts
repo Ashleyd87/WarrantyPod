@@ -86,6 +86,13 @@ export interface ExtractionResult {
   confidence: Record<string, "high" | "medium" | "low">;
 }
 
+export interface BarcodeProduct {
+  brand: string | null;
+  modelName: string | null;
+  category: string | null;
+  warrantyMonths: number | null;
+}
+
 export function authHeaders(): Record<string, string> {
   const cookie = authClient.getCookie();
   return cookie ? { Cookie: cookie } : {};

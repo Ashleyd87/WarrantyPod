@@ -114,6 +114,18 @@ model ClaimContact {
   @@unique([kind, name])
 }
 
+// Shared cache of products identified from a scanned UPC/EAN. A barcode maps
+// to the same product for every user, so this is global, not per-account.
+model BarcodeProduct {
+  code           String   @id
+  brand          String?
+  modelName      String?
+  category       String?
+  warrantyMonths Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 model ProductItem {
   id                     String    @id @default(cuid())
   userId                 String
